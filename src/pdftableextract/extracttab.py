@@ -18,7 +18,7 @@ def process_page(pgs) :
 
   p = subprocess.Popen( ("pdftoppm -gray -r %d -f %d -l %d %s " %
       (args.r,pg,pg,quote(args.infile))),
-      stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True )
+      stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
 
 #-----------------------------------------------------------------------
 # image load secion.
@@ -28,7 +28,7 @@ def process_page(pgs) :
   pad = int(args.pad)
   height+=pad*2
   width+=pad*2
-  
+
 # reimbed image with a white padd.
   bmp = ones( (height,width) , dtype=bool )
   bmp[pad:height-pad,pad:width-pad] = ( data[:,:] > int(255.0*args.g/100.0) )
@@ -47,25 +47,25 @@ def process_page(pgs) :
     t=t+1
   if t > 0 :
     t=t-1
-  
+
   b=height-1
   while b > t and sum(bmp[b,:]==0) == 0 :
     b=b-1
   if b < height-1:
     b = b+1
-  
+
   l=0
   while l < width and sum(bmp[:,l]==0) == 0 :
     l=l+1
   if l > 0 :
     l=l-1
-  
+
   r=width-1
   while r > l and sum(bmp[:,r]==0) == 0 :
     r=r-1
   if r < width-1 :
     r=r+1
-  
+
 # Mark bounding box.
   bmp[t,:] = 0
   bmp[b,:] = 0
@@ -77,13 +77,13 @@ def process_page(pgs) :
     if len(s) < 4 :
       raise Exception("boxes have format left:top:right:bottom[:page]")
     return ([args.r * float(x) + args.pad for x in s[0:4] ]
-                + [ p if len(s)<5 else int(s[4]) ] ) 
+                + [ p if len(s)<5 else int(s[4]) ] )
 
 
 # translate crop to paint white.
   whites = []
   if args.crop :
-    (l,t,r,b,p) = boxOfString(args.crop,pg) 
+    (l,t,r,b,p) = boxOfString(args.crop,pg)
     whites.extend( [ (0,0,l,height,p), (0,0,width,t,p),
                      (r,0,width,height,p), (0,b,width,height,p) ] )
 
@@ -95,7 +95,7 @@ def process_page(pgs) :
     if p == pg :
       bmp[ t:b+1,l:r+1 ] = 1
       img[ t:b+1,l:r+1 ] = [255,255,255]
-  
+
 # paint black ...
   if args.black :
     for b in args.black :
@@ -106,18 +106,18 @@ def process_page(pgs) :
   if args.checkcrop :
     dumpImage(args,bmp,img)
     sys.exit(0)
-    
-  
+
+
 #-----------------------------------------------------------------------
 # Line finding section.
 #
-# Find all verticle or horizontal lines that are more than rlthresh 
+# Find all verticle or horizontal lines that are more than rlthresh
 # long, these are considered lines on the table grid.
 
   lthresh = int(args.l * args.r)
   vs = zeros(width, dtype=int)
   for i in range(width) :
-    dd = diff( where(bmp[:,i])[0] ) 
+    dd = diff( where(bmp[:,i])[0] )
     if len(dd)>0:
       v = max ( dd )
       if v > lthresh :
@@ -153,62 +153,62 @@ def process_page(pgs) :
       vd = delete(vd,i)
     else:
       i=i+2
-  
-  j = 0 
+
+  j = 0
   while j < len(hd):
     if hd[j+1]-hd[j] > maxdiv :
       hd = delete(hd,j)
       hd = delete(hd,j)
     else:
       j=j+2
-  
+
   if args.checklines :
     for i in vd :
       img[:,i] = [255,0,0] # red
-  
+
     for j in hd :
       img[j,:] = [0,0,255] # blue
     dumpImage(args,bmp,img)
     sys.exit(0)
-  
+
 #-----------------------------------------------------------------------
 # divider checking.
 #
-# at this point vd holds the x coordinate of vertical  and 
-# hd holds the y coordinate of horizontal divider tansitions for each 
+# at this point vd holds the x coordinate of vertical  and
+# hd holds the y coordinate of horizontal divider tansitions for each
 # vertical and horizontal lines in the table grid.
 
   def isDiv(a, l,r,t,b) :
           # if any col or row (in axis) is all zeros ...
-    return sum( sum(bmp[t:b, l:r], axis=a)==0 ) >0 
+    return sum( sum(bmp[t:b, l:r], axis=a)==0 ) >0
 
   if args.checkdivs :
     img = img / 2
     for j in range(0,len(hd),2):
       for i in range(0,len(vd),2):
         if i>0 :
-          (l,r,t,b) = (vd[i-1], vd[i],   hd[j],   hd[j+1]) 
+          (l,r,t,b) = (vd[i-1], vd[i],   hd[j],   hd[j+1])
           img[ t:b, l:r, 1 ] = 192
           if isDiv(1, l,r,t,b) :
             img[ t:b, l:r, 0 ] = 0
             img[ t:b, l:r, 2 ] = 255
-          
+
         if j>0 :
           (l,r,t,b) = (vd[i],   vd[i+1], hd[j-1], hd[j] )
           img[ t:b, l:r, 1 ] = 128
           if isDiv(0, l,r,t,b) :
             img[ t:b, l:r, 0 ] = 255
             img[ t:b, l:r, 2 ] = 0
-  
+
     dumpImage(args,bmp,img)
     sys.exit(0)
-  
+
 #-----------------------------------------------------------------------
 # Cell finding section.
 # This algorithum is width hungry, and always generates rectangular
 # boxes.
 
-  cells =[] 
+  cells =[]
   touched = zeros( (len(hd), len(vd)),dtype=bool )
   j = 0
   while j*2+2 < len (hd) :
@@ -233,8 +233,8 @@ def process_page(pgs) :
         touched[ j:j+v, i:i+u] = True
       i = i+1
     j=j+1
-  
-  
+
+
   if args.checkcells :
     nc = len(cells)+0.
     img = img / 2
@@ -244,25 +244,25 @@ def process_page(pgs) :
       img[ t:b, l:r ] += col( k/nc )
     dumpImage(args,bmp,img)
     sys.exit(0)
-  
-  
+
+
 #-----------------------------------------------------------------------
 # fork out to extract text for each cell.
 
   whitespace = re.compile( r'\s+')
-   
+
   def getCell( (i,j,u,v) ):
     (l,r,t,b) = ( vd[2*i+1] , vd[ 2*(i+u) ], hd[2*j+1], hd[2*(j+v)] )
     p = subprocess.Popen(
     ("pdftotext -r %d -x %d -y %d -W %d -H %d -layout -nopgbrk -f %d -l %d %s -"
          % (args.r, l-pad, t-pad, r-l, b-t, pg, pg, quote(args.infile) ) ),
         stdout=subprocess.PIPE, shell=True )
-    
+
     ret = p.communicate()[0]
     if args.w != 'raw' :
       ret = whitespace.sub( "" if args.w == "none" else " ", ret )
       if len(ret) > 0 :
-        ret = ret[ (1 if ret[0]==' ' else 0) : 
+        ret = ret[ (1 if ret[0]==' ' else 0) :
                    len(ret) - (1 if ret[-1]==' ' else 0) ]
     return (i,j,u,v,pg,ret)
 
@@ -270,12 +270,12 @@ def process_page(pgs) :
   #  cells = [ x + (pg,"",) for x in cells ]
   #else :
   #  cells = map(getCell, cells)
-  
+
   if args.boxes :
-    cells = [ x + (pg,"",) for x in cells if 
+    cells = [ x + (pg,"",) for x in cells if
               ( frow == None or (x[1] >= frow and x[1] <= lrow)) ]
   else :
-    cells = [ getCell(x)   for x in cells if 
+    cells = [ getCell(x)   for x in cells if
               ( frow == None or (x[1] >= frow and x[1] <= lrow)) ]
   return cells
 
@@ -294,4 +294,3 @@ def main_script():
       "cells_xml" : o_cells_xml,   "table_csv"  : o_table_csv,
       "table_html": o_table_html,  "table_chtml": o_table_html,
       } [ args.t ](cells,args.page)
-

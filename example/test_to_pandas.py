@@ -1,3 +1,4 @@
+from __future__ import print_function
 import pandas as pd
 import pdftableextract as pdf
 
@@ -17,4 +18,4 @@ li = pdf.table_to_list(cells, pages)[1]
 #data is row '2' through '-1'
 
 data =pd.DataFrame(li[2:-1], columns=li[1], index=[l[0] for l in li[2:-1]])
-print data
+print (data)
