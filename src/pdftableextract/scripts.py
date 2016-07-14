@@ -2,8 +2,8 @@ import argparse
 import sys
 import logging
 import subprocess
-from .core import process_page, output
-import core
+from pdftableextract.core import process_page, output
+import pdftableextract.core
 
 #-----------------------------------------------------------------------
 
