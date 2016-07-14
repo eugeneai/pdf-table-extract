@@ -13,4 +13,8 @@ tables in ST Micro’s datasheets. The script requires numpy and poppler
 ###Tags
 [Utilities](http://ashimagroup.net/os/tag/utilities)
 
-
+###Requires
+apt-get install python-dev poppler-utils
+yum install python-devel poppler-utils
+[numpy](http://www.numpy.org/)
+[pandas](http://pandas.pydata.org/)
