@@ -70,7 +70,8 @@ def process_page(infile, pgs,
     checkdivs=False,
     checkcells=False,
     whitespace="normalize",
-    boxes=False) :
+    boxes=False,
+    encoding="utf8") :
 
   outfile = open(outfilename,'w') if outfilename else sys.stdout
   page=page or []
@@ -321,7 +322,7 @@ def process_page(infile, pgs,
       if len(ret) > 0 :
         ret = ret[ (1 if ret[0]==b' ' else 0) :
                    len(ret) - (1 if ret[-1]==b' ' else 0) ]
-    return (i,j,u,v,pg,ret)
+    return (i,j,u,v,pg,ret.decode(encoding))
 
   if boxes :
     cells = [ x + (pg,b"",) for x in cells if
