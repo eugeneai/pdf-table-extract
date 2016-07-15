@@ -22,8 +22,6 @@ class PopplerProcessor(object):
         """
         self.p=Popp
 
-
-
 #-----------------------------------------------------------------------
 def check_for_required_executable(name,command):
     """Checks for an executable called 'name' by running 'command' and supressing

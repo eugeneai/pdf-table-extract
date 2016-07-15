@@ -5,10 +5,9 @@ here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'README.md')).read()
 #NEWS = open(os.path.join(here, 'NEWS.txt')).read()
 
-
 version = '0.1'
 
-install_requires = [ "numpy", "ruamel.venvgtk" ]
+install_requires = ["numpy", "ruamel.venvgtk"]
 
 
 setup(name='pdf-table-extract',
@@ -21,7 +20,7 @@ setup(name='pdf-table-extract',
     keywords='PDF, tables',
     author='Ian McEwan',
     author_email='ijm@ashimaresearch.com',
-    url='ashimaresearch.com',
+    url='ashimaresearch.dcom',
     license='MIT-Expat',
     packages=find_packages('src'),
     package_dir = {'': 'src'},include_package_data=True,
@@ -31,4 +30,4 @@ setup(name='pdf-table-extract',
         'console_scripts':
             ['pdf-table-extract=pdftableextract.scripts:main']
     }
-)
+      )
