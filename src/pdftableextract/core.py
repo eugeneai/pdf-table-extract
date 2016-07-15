@@ -82,7 +82,7 @@ class PopplerProcessor(object):
         new = zeros(data.shape, dtype=uint8)
         new[:, :, :] = data
         new = new[:, :, 0:3]
-        print(data)
+        #print(data)
         rc = alpha <= self.greyscale_threshold
 
         new[rc, 0] = 255
@@ -167,15 +167,15 @@ def process_page(infile,
                  white=None,
                  black=None,
                  bitmap=False,
-                 checkcrop=False,
-                 checklines=False,
-                 checkdivs=False,
-                 checkcells=False,
+                 checkcrop=True,
+                 checklines=True,
+                 checkdivs=True,
+                 checkcells=True,
                  whitespace="normalize",
                  boxes=False,
                  encoding="utf8"):
 
-    outfile = outfilename if outfilename else sys.stdout
+    outfile = outfilename if outfilename else "output"
     pdfdoc = PopplerProcessor(infile)
     page = page or []
     (pg, frow, lrow) = (list(map(int, (pgs.split(":")))) + [None, None])[0:3]
@@ -202,11 +202,11 @@ def process_page(infile,
     thr = int(255.0 * greyscale_threshold / 100.0)
 
     bmp[pad:height - pad, pad:width - pad] = (data[:, :] > thr)
-
+    bmp = bmp == False
     imsave("foo.png", bmp)
     # Set up Debuging image.
     img = zeros((height, width, 3), dtype=uint8)
-    img[:, :, :] = bmp
+    img[:, :, :] = bmp * 255
     #img[:, :, 0] = bmp * 255
     #img[:, :, 1] = bmp * 255
     #img[:, :, 2] = bmp * 255
@@ -214,34 +214,39 @@ def process_page(infile,
     #-----------------------------------------------------------------------
     # Find bounding box.
     t = 0
-    while t < height and sum(bmp[t, :] == 0) == 0:
+    imsave("bmp-test.png", bmp)
+
+    while t < height and all(bmp[t, :]) == False:
         t = t + 1
     if t > 0:
         t = t - 1
 
+    import pdb
+    pdb.set_trace()
     b = height - 1
-    while b > t and sum(bmp[b, :] == 0) == 0:
+    while b > t and all(bmp[b, :]) == False:
         b = b - 1
     if b < height - 1:
         b = b + 1
 
     l = 0
-    while l < width and sum(bmp[:, l] == 0) == 0:
+    while l < width and all(bmp[:, l]) == False:
         l = l + 1
     if l > 0:
         l = l - 1
 
     r = width - 1
-    while r > l and sum(bmp[:, r] == 0) == 0:
+    while r > l and all(bmp[:, r]) == False:
         r = r - 1
     if r < width - 1:
         r = r + 1
 
 # Mark bounding box.
-    bmp[t, :] = 0
-    bmp[b, :] = 0
-    bmp[:, l] = 0
-    bmp[:, r] = 0
+    bmp[t, :, 0] = True
+    bmp[b, :, 0] = True
+    bmp[:, l, 0] = True
+    bmp[:, r, 0] = True
+    imsave("bmp-bbox.png", bmp)
 
     def boxOfString(x, p):
         s = x.split(":")
