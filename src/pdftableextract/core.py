@@ -1,19 +1,34 @@
 import sys
 import os
 from numpy import array, fromstring, ones, zeros, uint8, diff, where, sum, delete
-import subprocess
-from pipes import quote
+#import subprocess
+#from pipes import quote
 from pdftableextract.pnm import readPNM, dumpImage
 import re
-from pipes import quote
+#from pipes import quote
 from xml.dom.minidom import getDOMImplementation
 import json
 import csv
+import gi
+gi.require_version('Gtk', '3.0')
+from gi.repository import Poppler
+
+class PopplerProcessor(object):
+    """
+    """
+
+    def __init__(self, **kwargs):
+        """
+        """
+        self.p=Popp
+
+
 
 #-----------------------------------------------------------------------
 def check_for_required_executable(name,command):
     """Checks for an executable called 'name' by running 'command' and supressing
     output. If the return code is non-zero or an OS error occurs, an Exception is raised"""
+    return
     try:
         with open(os.devnull, "w") as fnull:
             result=subprocess.check_call(command,stdout=fnull, stderr=fnull)
@@ -29,6 +44,8 @@ Command failed: {1}
 
 #-----------------------------------------------------------------------
 def popen(name,command, *args, **kwargs):
+    print (name,command, *args, **kwargs)
+    wew
     try:
         result=subprocess.Popen(command,*args, **kwargs)
         return result
@@ -81,8 +98,7 @@ def process_page(infile, pgs,
   #end check
 
   p = popen("pdftoppm", ("pdftoppm -gray -r %d -f %d -l %d %s " %
-      (bitmap_resolution,pg,pg,quote(infile))),
-      stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True )
+      (bitmap_resolution,pg,pg,infile)))
 
 #-----------------------------------------------------------------------
 # image load secion.
@@ -312,7 +328,7 @@ def process_page(infile, pgs,
     (i,j,u,v) =_coordinate
     (l,r,t,b) = ( vd[2*i+1] , vd[ 2*(i+u) ], hd[2*j+1], hd[2*(j+v)] )
     p = popen("pdftotext",
-              "pdftotext -r %d -x %d -y %d -W %d -H %d -layout -nopgbrk -f %d -l %d %s -" % (bitmap_resolution, l-pad, t-pad, r-l, b-t, pg, pg, quote(infile)),
+              "pdftotext -r %d -x %d -y %d -W %d -H %d -layout -nopgbrk -f %d -l %d %s -" % (bitmap_resolution, l-pad, t-pad, r-l, b-t, pg, pg, infile),
               stdout=subprocess.PIPE,
               shell=True )
 

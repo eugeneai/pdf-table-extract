@@ -1,0 +1,3 @@
+numpy
+ruamel.venvgtk
+# pandas
