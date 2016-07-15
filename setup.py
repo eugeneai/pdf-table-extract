@@ -30,4 +30,4 @@ setup(name='pdf-table-extract',
         'console_scripts':
             ['pdf-table-extract=pdftableextract.scripts:main']
     }
-      )
+)

@@ -1,6 +1,7 @@
 import sys
 import os
-from numpy import array, fromstring, ones, zeros, uint8, diff, where, sum, delete
+from numpy import array, fromstring, ones, zeros, uint8, diff, where, sum, delete, frombuffer, reshape
+import numpy
 #import subprocess
 #from pipes import quote
 from pdftableextract.pnm import readPNM, dumpImage
@@ -11,16 +12,76 @@ import json
 import csv
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Poppler
+gi.require_version('Poppler', '0.18')
+from gi.repository import Gdk, Poppler
+import cairo
 
 class PopplerProcessor(object):
-    """
+    """Class for processing PDF. That's simple.
+    It does two functions.
+    1. Renders a page as a PNM graphics, and
+    2. Get text in a rectangular bounding box.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, filename, **kwargs):
+        """Opens a document denoted by filename.
         """
-        """
-        self.p=Popp
+        self.filename=os.path.abspath(filename)
+        self.document=Poppler.Document.new_from_file("file:"+self.filename, None)
+        self.page_num=self.document.get_n_pages()
+        self.resolution=300
+        self.greyscale_threshold=kwargs.get("greyscale_thresholds",25)
+
+    def get_page(self, index):
+        if index<0 or index>=self.page_num:
+            raise IndexError("page number is out of bounds")
+        return self.document.get_page(index)
+
+    def get_image(self, index):
+        page=self.get_page(index)
+        dpi=self.resolution
+        scale = 1
+        width, height = [int(x) for x in page.get_size ()]
+        d=dpi/72.
+        pxw, pxh=int(width * d), int(height * d)
+        # data=zeros((pxw,pxh,4), dtype=uint8)
+        surface = cairo.ImageSurface (
+            # data,
+            cairo.FORMAT_ARGB32,
+            pxw, pxh)
+
+        context = cairo.Context (surface)
+        context.scale (d, d)
+
+        context.save ()
+        page.render (context)
+        context.restore ()
+
+        pixbuf  = Gdk.pixbuf_get_from_surface (surface, 0, 0, pxw, pxh)
+        surface.write_to_png("page.png")
+        #img=image.set_from_pixbuf (pixbuf)
+        data=frombuffer(pixbuf.get_pixels(), dtype=uint8)
+        R=data[0::4]
+        G=data[1::4]
+        B=data[2::4]
+        A=data[3::4]
+        C=R*34+G*0.56+B*0.1
+        # print (max(A))
+        C=C.astype(uint8)
+        A=A<=self.greyscale_threshold
+        C[A]=255
+        # print (C)
+        return C.reshape((pxw,pxh))
+
+    def get_text(self, index, x,y, w,h):
+        rect=Poppler.Rectangle()
+        rect.x1,rect.y1=x,y
+        rect.x2,rect.y2=x+w,y+h
+        # print (help(rect))
+        pg=self.get_page(index)
+        txt=pg.get_text_for_area(rect)
+        Poppler.Rectangle.free(rect)
+        return txt
 
 #-----------------------------------------------------------------------
 def check_for_required_executable(name,command):
@@ -42,8 +103,7 @@ Command failed: {1}
 
 #-----------------------------------------------------------------------
 def popen(name,command, *args, **kwargs):
-    print (name,command, *args, **kwargs)
-    wew
+    #print (name,command, *args, **kwargs)
     try:
         result=subprocess.Popen(command,*args, **kwargs)
         return result
@@ -89,25 +149,25 @@ def process_page(infile, pgs,
     encoding="utf8") :
 
   outfile = open(outfilename,'w') if outfilename else sys.stdout
+  pdfdoc = PopplerProcessor(infile)
   page=page or []
   (pg,frow,lrow) = (list(map(int,(pgs.split(":"))))+[None,None])[0:3]
-  #check that pdftoppdm exists by running a simple command
-  check_for_required_executable("pdftoppm",["pdftoppm","-h"])
-  #end check
+  pdfdoc.resolution=bitmap_resolution
+  pdfdoc.greyscale_threshold=greyscale_threshold
 
-  p = popen("pdftoppm", ("pdftoppm -gray -r %d -f %d -l %d %s " %
-      (bitmap_resolution,pg,pg,infile)))
+  data = pdfdoc.get_image(pg-1)  # Page numbers are 0-based.
 
 #-----------------------------------------------------------------------
-# image load secion.
+# image load section.
 
-  (maxval, width, height, data) = readPNM(p.stdout)
+  #print(data.shape)
+  height, width = data.shape[:2]
 
   pad = int(pad)
   height+=pad*2
   width+=pad*2
 
-# reimbed image with a white padd.
+# reimbed image with a white pad.
   bmp = ones( (height,width) , dtype=bool )
   bmp[pad:height-pad,pad:width-pad] = ( data[:,:] > int(255.0*greyscale_threshold/100.0) )
 
@@ -325,26 +385,19 @@ def process_page(infile, pgs,
   def getCell( _coordinate):
     (i,j,u,v) =_coordinate
     (l,r,t,b) = ( vd[2*i+1] , vd[ 2*(i+u) ], hd[2*j+1], hd[2*(j+v)] )
-    p = popen("pdftotext",
-              "pdftotext -r %d -x %d -y %d -W %d -H %d -layout -nopgbrk -f %d -l %d %s -" % (bitmap_resolution, l-pad, t-pad, r-l, b-t, pg, pg, infile),
-              stdout=subprocess.PIPE,
-              shell=True )
-
-    ret = p.communicate()[0]
-    if whitespace != 'raw' :
-      ret = whitespace.sub( b"" if whitespace == "none" else b" ", ret )
-      if len(ret) > 0 :
-        ret = ret[ (1 if ret[0]==b' ' else 0) :
-                   len(ret) - (1 if ret[-1]==b' ' else 0) ]
-    return (i,j,u,v,pg,ret.decode(encoding))
+    ret = pdfdoc.get_text(pg-1, l-pad, t-pad, r-l, b-t)
+    # if whitespace != 'raw' :
+    #   ret = whitespace.sub( b"" if whitespace == "none" else b" ", ret )
+    #   if len(ret) > 0 :
+    #     ret = ret[ (1 if ret[0]==b' ' else 0) :
+    #                len(ret) - (1 if ret[-1]==b' ' else 0) ]
+    return (i,j,u,v,pg,ret)
 
   if boxes :
     cells = [ x + (pg,b"",) for x in cells if
               ( frow == None or (x[1] >= frow and x[1] <= lrow)) ]
   else :
-    #check that pdftotext exists by running a simple command
-    check_for_required_executable("pdftotext",["pdftotext","-h"])
-    #end check
+    print (cells)
     cells = [ getCell(x)   for x in cells if
               ( frow == None or (x[1] >= frow and x[1] <= lrow)) ]
   return cells
