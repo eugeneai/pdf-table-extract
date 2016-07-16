@@ -102,25 +102,6 @@ class PopplerProcessor(object):
         return txt
 
 
-    #-----------------------------------------------------------------------
-def check_for_required_executable(name, command):
-    """Checks for an executable called 'name' by running 'command' and supressing
-    output. If the return code is non-zero or an OS error occurs, an Exception is raised"""
-    return
-    try:
-        with open(os.devnull, "w") as fnull:
-            result = subprocess.check_call(command, stdout=fnull, stderr=fnull)
-    except OSError as e:
-        message = """Error running {0}.
-Command failed: {1}
-{2}""".format(name, " ".join(command), e)
-        raise OSError(message)
-    except subprocess.CalledProcessError as e:
-        raise
-    except Exception as e:
-        raise
-
-
 def colinterp(a, x):
     """Interpolates colors"""
     l = len(a) - 1
