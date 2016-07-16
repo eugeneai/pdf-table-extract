@@ -121,20 +121,6 @@ Command failed: {1}
         raise
 
 
-#-----------------------------------------------------------------------
-def popen(name, command, *args, **kwargs):
-    #print (name,command, *args, **kwargs)
-    try:
-        result = subprocess.Popen(command, *args, **kwargs)
-        return result
-    except OSError as e:
-        message = """Error running {0}. Is it installed correctly?
-Error: {1}""".format(name, e)
-        raise OSError(message)
-    except Exception as e:
-        raise
-
-
 def colinterp(a, x):
     """Interpolates colors"""
     l = len(a) - 1
