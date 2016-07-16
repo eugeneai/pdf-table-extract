@@ -227,25 +227,27 @@ def process_page(infile,
     t = 0
     imsave("bmp-start.png", bmp)
 
-    while t < height and bmp[t, :]:
+    while t < height and all(bmp[t, :]):
+        bbb=bmp[t,:]
+        print(any(bbb),all(bbb))
         t = t + 1
     if t > 0:
         t = t - 1
 
     b = height - 1
-    while b > t and bmp[b, :]:
+    while b > t and all(bmp[b, :]):
         b = b - 1
     if b < height - 1:
         b = b + 1
 
     l = 0
-    while l < width and bmp[:, l]:
+    while l < width and all(bmp[:, l]):
         l = l + 1
     if l > 0:
         l = l - 1
 
     r = width - 1
-    while r > l and bmp[:, r]:
+    while r > l and all(bmp[:, r]):
         r = r - 1
     if r < width - 1:
         r = r + 1
@@ -257,7 +259,7 @@ def process_page(infile,
     bmp[:, r] = False
     imsave("bbox-start.png", bmp)
     print ("Bbox", l,t,b,r)
-
+    
     def boxOfString(x, p):
         s = x.split(":")
         if len(s) < 4:
