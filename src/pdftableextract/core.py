@@ -192,7 +192,7 @@ def process_page(infile, pgs,
 
   hs = zeros(height, dtype=int)
   for j in range(height) :
-    dd = diff( where(bmp[j,:]==1)[0] )
+    dd = diff( where(bmp[j,:])[0] )
     if len(dd) > 0 :
       h = max ( dd )
       if h > lthresh :
@@ -201,7 +201,7 @@ def process_page(infile, pgs,
 # it was a solid black line.
       if bmp[j,0] == 0 :
         hs[j] = 1
-  hd=(  where(diff(hs[:]==1))[0] +1 )
+  hd=(  where(diff(hs[:]))[0] +1 )
 
 #-----------------------------------------------------------------------
 # Look for dividors that are too large.
