@@ -111,11 +111,53 @@ class PopplerProcessor(object):
 
 def colinterp(a, x):
     """Interpolates colors"""
-    l = len(a) - 1
-    i = min(l, max(0, int(x * l)))
-    (u, v) = a[i:i + 2, :]
-    return u - (u - v) * ((x * l) % 1.0)
+    l = len(a)-1
+    i = min(l, max(0, int (x * l)))
+    (u,v) = a[i:i+2,:]
+    return u - (u-v) * ((x * l) % 1.0)
 
+colarr = array([ [255,0,0],[255,255,0],[0,255,0],[0,255,255],[0,0,255] ])
+
+def col(x, colmult=1.0) :
+    """colors"""
+    return colinterp(colarr,(colmult * x)% 1.0) / 2
+
+
+def process_page(infile, pgs,
+    outfilename=None,
+    greyscale_threshold=25,
+    page=None,
+    crop=None,
+    line_length=0.17,
+    bitmap_resolution=300,
+    name=None,
+    pad=2,
+    white=None,
+    black=None,
+    bitmap=False,
+    checkcrop=False,
+    checklines=False,
+    checkdivs=False,
+    checkcells=False,
+    whitespace="normalize",
+    boxes=False,
+    encoding="utf8") :
+
+  outfile = open(outfilename,'wb') if outfilename else sys.stdout
+  page=page or []
+  (pg,frow,lrow) = (list(map(int,(pgs.split(":"))))+[None,None])[0:3]
+  #check that pdftoppdm exists by running a simple command
+  check_for_required_executable("pdftoppm",["pdftoppm","-h"])
+  #end check
+
+  p = popen("pdftoppm", ("pdftoppm -gray -r %d -f %d -l %d %s " %
+      (bitmap_resolution,pg,pg,quote(infile))),
+      stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True )
+
+#-----------------------------------------------------------------------
+# image load secion.
+
+  (maxval, width, height, data) = readPNM(p.stdout)
 
 colarr = array(
     [[255, 0, 0], [255, 255, 0], [0, 255, 0], [0, 255, 255], [0, 0, 255]])

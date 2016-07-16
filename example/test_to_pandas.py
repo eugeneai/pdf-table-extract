@@ -3,10 +3,17 @@ import pandas as pd
 import pdftableextract as pdf
 
 pages = ["1"]
-cells = [pdf.process_page("example.pdf", p) for p in pages]
+
+cells = [pdf.process_page("example.pdf",
+                          p,
+                          outfilename="weee.pnm",
+                          checkcrop=False,
+                          checklines=False,
+                          checkdivs=False,
+                          checkcells=False, ) for p in pages]
+print(cells)
 
 #flatten the cells structure
-print(cells)
 cells = [item for sublist in cells for item in sublist]
 
 #without any options, process_page picks up a blank table at the top of the page.

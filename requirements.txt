@@ -1,3 +1,4 @@
-numpy
 ruamel.venvgtk
-# pandas
+numpy
+matplotlib
+pandas
