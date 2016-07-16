@@ -77,7 +77,6 @@ class PopplerProcessor(object):
         # C[A] = 255
         # C = C.reshape((pxh, pxw))
         nd = zeros(C.shape, dtype=uint8)
-        print(nd.shape, C.shape)
         nd[:] = C
         nd[A <= self.greyscale_threshold] = 255
 
@@ -228,25 +227,25 @@ def process_page(infile,
     t = 0
     imsave("bmp-start.png", bmp)
 
-    while t < height and any(bmp[t, :]) == False:
+    while t < height and bmp[t, :]:
         t = t + 1
     if t > 0:
         t = t - 1
 
     b = height - 1
-    while b > t and any(bmp[b, :]) == False:
+    while b > t and bmp[b, :]:
         b = b - 1
     if b < height - 1:
         b = b + 1
 
     l = 0
-    while l < width and any(bmp[:, l]) == False:
+    while l < width and bmp[:, l]:
         l = l + 1
     if l > 0:
         l = l - 1
 
     r = width - 1
-    while r > l and any(bmp[:, r]) == False:
+    while r > l and bmp[:, r]:
         r = r - 1
     if r < width - 1:
         r = r + 1
@@ -257,6 +256,7 @@ def process_page(infile,
     bmp[:, l] = False
     bmp[:, r] = False
     imsave("bbox-start.png", bmp)
+    print ("Bbox", l,t,b,r)
 
     def boxOfString(x, p):
         s = x.split(":")
@@ -317,7 +317,7 @@ def process_page(infile,
 
     hs = zeros(height, dtype=uint8)
     for j in range(height):
-        dd = diff(where(bmp[j, :] == 1)[0])
+        dd = diff(where(bmp[j, :])[0])
         if len(dd) > 0:
             h = max(dd)
             if h > lthresh:
@@ -326,7 +326,7 @@ def process_page(infile,
             # it was a solid black line.
             if all(bmp[j, 0]) == 0:
                 hs[j] = 1
-    hd = (where(diff(hs[:]) == 1)[0] + 1)
+    hd = (where(diff(hs[:]))[0] + 1)
 
     #-----------------------------------------------------------------------
     # Look for dividors that are too large.

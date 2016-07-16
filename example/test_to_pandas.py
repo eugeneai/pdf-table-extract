@@ -8,7 +8,7 @@ cells = [pdf.process_page("example.pdf",
                           p,
                           outfilename="weee.pnm",
                           checkcrop=False,
-                          checklines=False,
+                          checklines=True,
                           checkdivs=False,
                           checkcells=False, ) for p in pages]
 print(cells)
