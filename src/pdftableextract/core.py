@@ -65,31 +65,38 @@ class PopplerProcessor(object):
         surface.write_to_png("page.png")
         #img=image.set_from_pixbuf (pixbuf)
         data = frombuffer(pixbuf.get_pixels(), dtype=uint8)
-        # R = data[0::4]
-        # G = data[1::4]
-        # B = data[2::4]
-        # A = data[3::4]
-        # C = R * 34 + G * 0.56 + B * 0.1
+        R = data[0::4]
+        G = data[1::4]
+        B = data[2::4]
+        A = data[3::4]
+        C = R * 34 + G * 56 + B * 10 / 100.
         # # print (max(A))
-        # C = C.astype(uint8)
+        C = C.astype(uint8)
+
         # A = A <= self.greyscale_threshold
         # C[A] = 255
         # C = C.reshape((pxh, pxw))
-        data = data.reshape((pxh, pxw, 4))
-        #d = data[:, :, 3]
-        alpha = data[:, :, 3]
-        new = zeros(data.shape, dtype=uint8)
-        new[:, :, :] = data
-        new = new[:, :, 0:3]
-        #print(data)
-        rc = alpha <= self.greyscale_threshold
+        nd = zeros(C.shape, dtype=uint8)
+        print(nd.shape, C.shape)
+        nd[:] = C
+        nd[A <= self.greyscale_threshold] = 255
 
-        new[rc, 0] = 255
-        new[rc, 1] = 255
-        new[rc, 2] = 255
+        #data = data.reshape((pxh, pxw, 4))
+        #d = data[:, :, 3]
+        #alpha = data[:, :, 3]
+        #new = zeros(data.shape, dtype=uint8)
+        #new[:, :, :] = data
+        #new = new[:, :, 0:3]
+        #print(data)
+        #rc = alpha <= self.greyscale_threshold
+
+        #new[rc, 0] = 255
+        #new[rc, 1] = 255
+        #new[rc, 2] = 255
         #new[:, :, 3] = 255
-        imsave('nomask.png', new)
-        return new, rc, page
+        nd = nd.reshape((pxh, pxw))
+        imsave('nomask.png', nd)
+        return nd, page
 
     def get_text(self, page, x, y, w, h):
         rect = Poppler.Rectangle()
@@ -126,7 +133,7 @@ def process_page(infile,
                  page=None,
                  crop=None,
                  line_length=0.17,
-                 bitmap_resolution=150, #300,
+                 bitmap_resolution=150, # 300,
                  name=None,
                  pad=2,
                  white=None,
@@ -147,9 +154,7 @@ def process_page(infile,
     pdfdoc.resolution = bitmap_resolution
     pdfdoc.greyscale_threshold = greyscale_threshold
 
-    data, notalpha, page = pdfdoc.get_image(
-        pg - 1)  # Page numbers are 0-based.
-    alpha = notalpha != 1
+    data, page = pdfdoc.get_image(pg - 1)  # Page numbers are 0-based.
 
     #-----------------------------------------------------------------------
     # image load section.
@@ -162,19 +167,19 @@ def process_page(infile,
     width += pad * 2
 
     # reimbed image with a white pad.
-    bmp = ones((height, width, 3), dtype=bool)
+    bmp = ones((height, width), dtype=bool)
 
     thr = int(255.0 * greyscale_threshold / 100.0)
-
+    imsave("white.png", bmp)
     bmp[pad:height - pad, pad:width - pad] = (data[:, :] > thr)
-    bmp = bmp == False
+    #bmp = bmp == False
     imsave("foo.png", bmp)
     # Set up Debuging image.
     img = zeros((height, width, 3), dtype=uint8)
-    img[:, :, :] = bmp * 255
-    #img[:, :, 0] = bmp * 255
-    #img[:, :, 1] = bmp * 255
-    #img[:, :, 2] = bmp * 255
+    #img[:, :, :] = bmp * 255
+    img[:, :, 0] = bmp * 255
+    img[:, :, 1] = bmp * 255
+    img[:, :, 2] = bmp * 255
 
     #-----------------------------------------------------------------------
     # Find bounding box.
@@ -205,10 +210,11 @@ def process_page(infile,
         r = r + 1
 
 # Mark bounding box.
-    bmp[t, :] = True
-    bmp[b, :] = True
-    bmp[:, l] = True
-    bmp[:, r] = True
+    bmp[t, :] = False
+    bmp[b, :] = False
+    bmp[:, l] = False
+    bmp[:, r] = False
+    imsave("bbox-start.png", bmp)
 
     def boxOfString(x, p):
         s = x.split(":")
@@ -255,8 +261,6 @@ def process_page(infile,
     lthresh = int(line_length * bitmap_resolution)
     vs = zeros(width, dtype=uint8)
 
-    import pdb
-    pdb.set_trace()
     for i in range(width):
         dd = diff(where(bmp[:, i])[0])
         if len(dd) > 0:
@@ -271,7 +275,7 @@ def process_page(infile,
 
     hs = zeros(height, dtype=uint8)
     for j in range(height):
-        dd = diff(where(bmp[j, :])[0])
+        dd = diff(where(bmp[j, :] == 1)[0])
         if len(dd) > 0:
             h = max(dd)
             if h > lthresh:
@@ -280,7 +284,7 @@ def process_page(infile,
             # it was a solid black line.
             if all(bmp[j, 0]) == 0:
                 hs[j] = 1
-    hd = (where(diff(hs[:]))[0] + 1)
+    hd = (where(diff(hs[:]) == 1)[0] + 1)
 
     #-----------------------------------------------------------------------
     # Look for dividors that are too large.
