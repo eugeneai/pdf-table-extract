@@ -73,7 +73,7 @@ def process_page(infile, pgs,
     boxes=False,
     encoding="utf8") :
 
-  outfile = open(outfilename,'w') if outfilename else sys.stdout
+  outfile = open(outfilename,'wb') if outfilename else sys.stdout
   page=page or []
   (pg,frow,lrow) = (list(map(int,(pgs.split(":"))))+[None,None])[0:3]
   #check that pdftoppdm exists by running a simple command
