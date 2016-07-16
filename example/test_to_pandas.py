@@ -6,6 +6,7 @@ pages = ["1"]
 cells = [pdf.process_page("example.pdf", p) for p in pages]
 
 #flatten the cells structure
+print(cells)
 cells = [item for sublist in cells for item in sublist]
 
 #without any options, process_page picks up a blank table at the top of the page.

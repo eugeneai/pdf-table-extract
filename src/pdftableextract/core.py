@@ -74,7 +74,6 @@ class PopplerProcessor(object):
         # C = C.astype(uint8)
         # A = A <= self.greyscale_threshold
         # C[A] = 255
-
         # C = C.reshape((pxh, pxw))
         data = data.reshape((pxh, pxw, 4))
         #d = data[:, :, 3]
@@ -100,11 +99,10 @@ class PopplerProcessor(object):
         txt = page.get_text_for_area(rect)
         #rect.free()
         #Poppler.Rectangle.free(rect)
-
         return txt
 
 
-#-----------------------------------------------------------------------
+    #-----------------------------------------------------------------------
 def check_for_required_executable(name, command):
     """Checks for an executable called 'name' by running 'command' and supressing
     output. If the return code is non-zero or an OS error occurs, an Exception is raised"""
@@ -161,13 +159,13 @@ def process_page(infile,
                  page=None,
                  crop=None,
                  line_length=0.17,
-                 bitmap_resolution=300,
+                 bitmap_resolution=150, #300,
                  name=None,
                  pad=2,
                  white=None,
                  black=None,
                  bitmap=False,
-                 checkcrop=True,
+                 checkcrop=False,
                  checklines=True,
                  checkdivs=True,
                  checkcells=True,
@@ -214,39 +212,36 @@ def process_page(infile,
     #-----------------------------------------------------------------------
     # Find bounding box.
     t = 0
-    imsave("bmp-test.png", bmp)
+    imsave("bmp-start.png", bmp)
 
-    while t < height and all(bmp[t, :]) == False:
+    while t < height and any(bmp[t, :]) == False:
         t = t + 1
     if t > 0:
         t = t - 1
 
-    import pdb
-    pdb.set_trace()
     b = height - 1
-    while b > t and all(bmp[b, :]) == False:
+    while b > t and any(bmp[b, :]) == False:
         b = b - 1
     if b < height - 1:
         b = b + 1
 
     l = 0
-    while l < width and all(bmp[:, l]) == False:
+    while l < width and any(bmp[:, l]) == False:
         l = l + 1
     if l > 0:
         l = l - 1
 
     r = width - 1
-    while r > l and all(bmp[:, r]) == False:
+    while r > l and any(bmp[:, r]) == False:
         r = r - 1
     if r < width - 1:
         r = r + 1
 
 # Mark bounding box.
-    bmp[t, :, 0] = True
-    bmp[b, :, 0] = True
-    bmp[:, l, 0] = True
-    bmp[:, r, 0] = True
-    imsave("bmp-bbox.png", bmp)
+    bmp[t, :] = True
+    bmp[b, :] = True
+    bmp[:, l] = True
+    bmp[:, r] = True
 
     def boxOfString(x, p):
         s = x.split(":")
@@ -287,11 +282,14 @@ def process_page(infile,
 #-----------------------------------------------------------------------
 # Line finding section.
 #
-# Find all vertical or horizontal lines that are more than rlthresh
+# Find all vertical or horizontal lines that are more than lthresh
 # long, these are considered lines on the table grid.
 
     lthresh = int(line_length * bitmap_resolution)
-    vs = zeros(width, dtype=int)
+    vs = zeros(width, dtype=uint8)
+
+    import pdb
+    pdb.set_trace()
     for i in range(width):
         dd = diff(where(bmp[:, i])[0])
         if len(dd) > 0:
@@ -304,9 +302,9 @@ def process_page(infile,
                 vs[i] = 1
     vd = (where(diff(vs[:]))[0] + 1)
 
-    hs = zeros(height, dtype=int)
+    hs = zeros(height, dtype=uint8)
     for j in range(height):
-        dd = diff(where(bmp[j, :] == 1)[0])
+        dd = diff(where(bmp[j, :])[0])
         if len(dd) > 0:
             h = max(dd)
             if h > lthresh:
@@ -315,7 +313,7 @@ def process_page(infile,
             # it was a solid black line.
             if all(bmp[j, 0]) == 0:
                 hs[j] = 1
-    hd = (where(diff(hs[:] == 1))[0] + 1)
+    hd = (where(diff(hs[:]))[0] + 1)
 
     #-----------------------------------------------------------------------
     # Look for dividors that are too large.
@@ -429,7 +427,7 @@ def process_page(infile,
 
     if boxes:
         cells = [x + (pg,
-                      b"", ) for x in cells
+                      "", ) for x in cells
                  if (frow == None or (x[1] >= frow and x[1] <= lrow))]
     else:
         print(cells)
