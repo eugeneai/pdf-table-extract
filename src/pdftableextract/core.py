@@ -45,7 +45,8 @@ class PopplerProcessor(object):
         dpi = self.resolution
         scale = 1
         width, height = [int(x) for x in page.get_size()]
-        d = dpi / 72.
+        d = self.scale = dpi / 72.
+        self.frac_scale=1/d
         pxw, pxh = int(width * d), int(height * d)
         # data=zeros((pxw,pxh,4), dtype=uint8)
         surface = cairo.ImageSurface(
@@ -97,12 +98,33 @@ class PopplerProcessor(object):
         imsave('nomask.png', nd)
         return nd, page
 
+    def print_rect(self, msg, r, page):
+        x1,y1,x2,y2= r.x1, r.y1, r.x2, r.y2
+        x, y, w, h = x1, y1, x2 - x1, y2 - y1
+        print(msg, x, y, w, h, "---", x1,y1,x2,y2)
+        width, height = [int(x) for x in page.get_size()]
+        print(msg, x, height-y, w, h, "---", x1,height-y1,x2,height-y2)
+
     def get_text(self, page, x, y, w, h):
+        #cb = page.get_crop_box()
+        #self.print_rect("Rect crop", cb)
+        width, height = [int(x) for x in page.get_size()]
+        #print("Page_size", width, height)
+        print(x, y, w, h)
+        fc=self.frac_scale
+        print ("FC:",fc)
+        x,y,w,h = (z*fc for z in [x,y,w,h])
         rect = Poppler.Rectangle()
+        print("shifted:",x, y, w, h)
         rect.x1, rect.y1 = x, y
         rect.x2, rect.y2 = x + w, y + h
-        # print (help(rect))
+        self.print_rect ("box:", rect, page)
         txt = page.get_text_for_area(rect)
+        print (txt)
+        attrs=page.get_text_attributes_for_area(rect)
+        print([(a.start_index,a.end_index) for a in attrs])
+        print(help(attrs[0]))
+        wer
         #rect.free()
         #Poppler.Rectangle.free(rect)
         return txt
@@ -110,53 +132,11 @@ class PopplerProcessor(object):
 
 def colinterp(a, x):
     """Interpolates colors"""
-    l = len(a)-1
-    i = min(l, max(0, int (x * l)))
-    (u,v) = a[i:i+2,:]
-    return u - (u-v) * ((x * l) % 1.0)
+    l = len(a) - 1
+    i = min(l, max(0, int(x * l)))
+    (u, v) = a[i:i + 2, :]
+    return u - (u - v) * ((x * l) % 1.0)
 
-colarr = array([ [255,0,0],[255,255,0],[0,255,0],[0,255,255],[0,0,255] ])
-
-def col(x, colmult=1.0) :
-    """colors"""
-    return colinterp(colarr,(colmult * x)% 1.0) / 2
-
-
-def process_page(infile, pgs,
-    outfilename=None,
-    greyscale_threshold=25,
-    page=None,
-    crop=None,
-    line_length=0.17,
-    bitmap_resolution=300,
-    name=None,
-    pad=2,
-    white=None,
-    black=None,
-    bitmap=False,
-    checkcrop=False,
-    checklines=False,
-    checkdivs=False,
-    checkcells=False,
-    whitespace="normalize",
-    boxes=False,
-    encoding="utf8") :
-
-  outfile = open(outfilename,'wb') if outfilename else sys.stdout
-  page=page or []
-  (pg,frow,lrow) = (list(map(int,(pgs.split(":"))))+[None,None])[0:3]
-  #check that pdftoppdm exists by running a simple command
-  check_for_required_executable("pdftoppm",["pdftoppm","-h"])
-  #end check
-
-  p = popen("pdftoppm", ("pdftoppm -gray -r %d -f %d -l %d %s " %
-      (bitmap_resolution,pg,pg,quote(infile))),
-      stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True )
-
-#-----------------------------------------------------------------------
-# image load secion.
-
-  (maxval, width, height, data) = readPNM(p.stdout)
 
 colarr = array(
     [[255, 0, 0], [255, 255, 0], [0, 255, 0], [0, 255, 255], [0, 0, 255]])
@@ -166,27 +146,33 @@ def col(x, colmult=1.0):
     """colors"""
     return colinterp(colarr, (colmult * x) % 1.0) / 2
 
-
 def process_page(infile,
                  pgs,
                  outfilename=None,
                  greyscale_threshold=25,
                  page=None,
                  crop=None,
-                 line_length=0.17,
-                 bitmap_resolution=150, # 300,
+                 line_length=0.5,
+                 bitmap_resolution=72, # 300,
                  name=None,
                  pad=2,
                  white=None,
                  black=None,
                  bitmap=False,
                  checkcrop=False,
-                 checklines=True,
-                 checkdivs=True,
-                 checkcells=True,
+                 checklines=False,
+                 checkdivs=False,
+                 checkcells=False,
+                 checkall=False,
                  whitespace="normalize",
                  boxes=False,
                  encoding="utf8"):
+
+    if checkall:
+        checkcrop = True
+        checklines = True
+        checkdivs = True
+        checkcells = True
 
     outfile = outfilename if outfilename else "output"
     pdfdoc = PopplerProcessor(infile)
@@ -222,14 +208,15 @@ def process_page(infile,
     img[:, :, 1] = bmp * 255
     img[:, :, 2] = bmp * 255
 
+    if checkdivs or checkcells:
+        imgfloat = img.astype(float)
+
     #-----------------------------------------------------------------------
     # Find bounding box.
     t = 0
     imsave("bmp-start.png", bmp)
 
     while t < height and all(bmp[t, :]):
-        bbb=bmp[t,:]
-        print(any(bbb),all(bbb))
         t = t + 1
     if t > 0:
         t = t - 1
@@ -258,8 +245,8 @@ def process_page(infile,
     bmp[:, l] = False
     bmp[:, r] = False
     imsave("bbox-start.png", bmp)
-    print ("Bbox", l,t,b,r)
-    
+    print("Bbox", l, t, b, r)
+
     def boxOfString(x, p):
         s = x.split(":")
         if len(s) < 4:
@@ -294,7 +281,6 @@ def process_page(infile,
 
     if checkcrop:
         imsave("crop-" + outfile + ".png", img)
-        return True
 
 #-----------------------------------------------------------------------
 # Line finding section.
@@ -357,20 +343,20 @@ def process_page(infile,
         for j in hd:
             img[j, :] = [0, 0, 255]  # blue
         imsave("lines-" + outfile + ".png", img)
-        return True
-#-----------------------------------------------------------------------
-# divider checking.
-#
-# at this point vd holds the x coordinate of vertical  and
-# hd holds the y coordinate of horizontal divider tansitions for each
-# vertical and horizontal lines in the table grid.
+
+        #-----------------------------------------------------------------------
+        # divider checking.
+        #
+        # at this point vd holds the x coordinate of vertical  and
+        # hd holds the y coordinate of horizontal divider tansitions for each
+        # vertical and horizontal lines in the table grid.
 
     def isDiv(a, l, r, t, b):
         # if any col or row (in axis) is all zeros ...
         return sum(sum(bmp[t:b, l:r], axis=a) == 0) > 0
 
     if checkdivs:
-        img = img / 2
+        img = (imgfloat / 2).astype(uint8)
         for j in range(0, len(hd), 2):
             for i in range(0, len(vd), 2):
                 if i > 0:
@@ -387,11 +373,11 @@ def process_page(infile,
                         img[t:b, l:r, 0] = 255
                         img[t:b, l:r, 2] = 0
         imsave("divs-" + outfile + ".png", img)
-        return True
-#-----------------------------------------------------------------------
-# Cell finding section.
-# This algorithum is width hungry, and always generates rectangular
-# boxes.
+
+        #-----------------------------------------------------------------------
+        # Cell finding section.
+        # This algorithum is width hungry, and always generates rectangular
+        # boxes.
 
     cells = []
     touched = zeros((len(hd), len(vd)), dtype=bool)
@@ -421,17 +407,17 @@ def process_page(infile,
 
     if checkcells:
         nc = len(cells) + 0.
-        img = img / 2
+        img = (imgfloat / 2.).astype(uint8)
         for k in range(len(cells)):
             (i, j, u, v) = cells[k]
             (l, r, t, b) = (vd[2 * i + 1], vd[2 * (i + u)], hd[2 * j + 1],
                             hd[2 * (j + v)])
-            img[t:b, l:r] += col(k / nc)
-        imsave("cells-" + outfile + ".png", img)
-        return True
+            img[t:b, l:r] += col(k / nc).astype(uint8)
 
-#-----------------------------------------------------------------------
-# fork out to extract text for each cell.
+        imsave("cells-" + outfile + ".png", img)
+
+        #-----------------------------------------------------------------------
+        # fork out to extract text for each cell.
 
     def getCell(_coordinate):
         (i, j, u, v) = _coordinate

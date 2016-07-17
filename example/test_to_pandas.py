@@ -6,11 +6,8 @@ pages = ["1"]
 
 cells = [pdf.process_page("example.pdf",
                           p,
-                          outfilename="weee.pnm",
-                          checkcrop=False,
-                          checklines=True,
-                          checkdivs=False,
-                          checkcells=False, ) for p in pages]
+                          outfilename="pandas-test",
+                          checkall=True) for p in pages]
 print(cells)
 
 #flatten the cells structure
@@ -26,5 +23,5 @@ li = pdf.table_to_list(cells, pages)[1]
 #row '1' contains column headings
 #data is row '2' through '-1'
 
-data = pd.DataFrame(li[2:-1], columns=li[1], index=[l[0] for l in li[2:-1]])
-print(data)
+#data = pd.DataFrame(li[2:-1], columns=li[1], index=[l[0] for l in li[2:-1]])
+#print(data)
