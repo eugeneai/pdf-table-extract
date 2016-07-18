@@ -66,7 +66,6 @@ class PopplerProcessor(object):
         d = self.scale = dpi / 72.
         self.frac_scale = 1 / d
         pxw, pxh = int(width * d), int(height * d)
-        # data=zeros((pxw,pxh,4), dtype=uint8)
         surface = cairo.ImageSurface(
             # data,
             cairo.FORMAT_ARGB32,
@@ -82,41 +81,25 @@ class PopplerProcessor(object):
 
         pixbuf = Gdk.pixbuf_get_from_surface(surface, 0, 0, pxw, pxh)
         surface.write_to_png("page.png")
-        #img=image.set_from_pixbuf (pixbuf)
         data = frombuffer(pixbuf.get_pixels(), dtype=uint8)
         R = data[0::4]
         G = data[1::4]
         B = data[2::4]
         A = data[3::4]
-        C = R * 34 + G * 56 + B * 10 / 100.
-        # # print (max(A))
+        C = (R * 34 + G * 56 + B * 10) / 100. # Convert to gray
+
         C = C.astype(uint8)
 
-        # A = A <= self.greyscale_threshold
-        # C[A] = 255
-        # C = C.reshape((pxh, pxw))
         nd = zeros(C.shape, dtype=uint8)
         nd[:] = C
         nd[A <= self.greyscale_threshold] = 255
-
-        #data = data.reshape((pxh, pxw, 4))
-        #d = data[:, :, 3]
-        #alpha = data[:, :, 3]
-        #new = zeros(data.shape, dtype=uint8)
-        #new[:, :, :] = data
-        #new = new[:, :, 0:3]
-        #print(data)
-        #rc = alpha <= self.greyscale_threshold
-
-        #new[rc, 0] = 255
-        #new[rc, 1] = 255
-        #new[rc, 2] = 255
-        #new[:, :, 3] = 255
         nd = nd.reshape((pxh, pxw))
-        imsave('nomask.png', nd)
+        # imsave('nomask.png', nd)
         return nd, page
 
     def print_rect(self, msg=None, r=None, page=None):
+        """Used for debugging.
+        """
         if None in [r, page]:
             raise ValueError("r and page arguments are required")
         x1, y1, x2, y2 = r.x1, r.y1, r.x2, r.y2
@@ -127,7 +110,11 @@ class PopplerProcessor(object):
               height - y2)
 
     def within(self, a, b, pad=0):
-        """Is Rectangle b within Rectangle a, i.e. b is in a
+        """Is Rectangle b within Rectangle a, i.e. b is in a.
+
+        Arguments:
+        - `a`, `b` : The rectangles;
+        - `pad` : Additional space.
         """
         if b.x1+pad < a.x1: return False
         if b.y1+pad < a.y1: return False
@@ -150,27 +137,19 @@ class PopplerProcessor(object):
         if r.y2 < l.y2: r.y2 = l.y2+pad
 
     def get_text(self, page, x, y, w, h):
-        #cb = page.get_crop_box()
-        #self.print_rect("Rect crop", cb)
         width, height = [int(x) for x in page.get_size()]
-        #print("Page_size", width, height)
-        ##print(x, y, w, h)
         fc = self.frac_scale
-        ##print("FC:", fc)
         x, y, w, h = (z * fc for z in [x, y, w, h])
         rect = Poppler.Rectangle()
-        ##print("shifted:", x, y, w, h)
         rect.x1, rect.y1 = x, y
         rect.x2, rect.y2 = x + w, y + h
         assert rect.x1<=rect.x2
         assert rect.y1<=rect.y2
-        #self.print_rect("box:", rect, page)
-        txt = page.get_text_for_area(rect)
-        ##print(txt)
-        attrs = page.get_text_attributes_for_area(rect)
-        ##print([(a.start_index, a.end_index) for a in attrs])
-        ##print(help(attrs[0]))
-        #chars=[]
+
+        # Could not make it work correctly # FIXME
+        # txt = page.get_text_for_area(rect)
+        # attrs = page.get_text_attributes_for_area(rect)
+
         r = Poppler.Rectangle()
         r.x1 = r.y1 = 1e10
         r.x2 = r.y2 = -1e10
@@ -179,27 +158,23 @@ class PopplerProcessor(object):
             if self.within(rect, l, pad=1):
                 self.rexpand(r, l, pad=0.5)
                 chars.append(self.text[k])
-        txt1="".join(chars)
-        #txt1 = page.get_text_for_area(r)
-        print ((r.x1,r.y1,r.x2,r.y2),txt1)
+        txt="".join(chars)
 
-        #interact(locals={"p": page, "d": self.document, "self": self})
-        #rect.free()
-        #Poppler.Rectangle.free(rect)
-        return txt1, r
+        # txt = page.get_text_for_area(r) # FIXME
+
+        return txt, r
 
     def get_rectangles_for_page(self, page):
         """Return all rectangles for all letters in the page..
-        Used for debugging
+        Used for debugging.
 
         Arguments:
-        - `page`:
+        - `page`: referece to page
         """
         layout=self.layout
         if layout == None:
             raise RuntimeError("page is not chosen")
 
-        #interact(locals={"layout":layout, "self":self})
         answer = [(r.x1,r.y1,r.x2,r.y2) for r in layout]
         return answer
 
@@ -262,8 +237,7 @@ def process_page(infile,
     #-----------------------------------------------------------------------
     # image load section.
 
-    #print(data.shape)
-    height, width = data.shape[:2]
+    height, width = data.shape[:2]  # If not to reduce to gray, the shape will be (,,3) or (,,4).
 
     pad = int(pad)
     height += pad * 2
@@ -273,13 +247,15 @@ def process_page(infile,
     bmp = ones((height, width), dtype=bool)
 
     thr = int(255.0 * greyscale_threshold / 100.0)
-    imsave("white.png", bmp)
+
     bmp[pad:height - pad, pad:width - pad] = (data[:, :] > thr)
-    #bmp = bmp == False
-    imsave("foo.png", bmp)
+
+
     # Set up Debuging image.
     img = zeros((height, width, 3), dtype=uint8)
-    #img[:, :, :] = bmp * 255
+
+    # img[:, :, :] = bmp * 255 # In case of colored input image
+
     img[:, :, 0] = bmp * 255
     img[:, :, 1] = bmp * 255
     img[:, :, 2] = bmp * 255
@@ -287,7 +263,7 @@ def process_page(infile,
     if checkdivs or checkcells or checkletters:
         imgfloat = img.astype(float)
 
-    if checkletters:
+    if checkletters:  # Show bounding boxes for each text object.
         img = (imgfloat/2.).astype(uint8)
         rectangles=pdfdoc.get_rectangles_for_page(pg)
         lrn=len(rectangles)
@@ -300,7 +276,6 @@ def process_page(infile,
     #-----------------------------------------------------------------------
     # Find bounding box.
     t = 0
-    imsave("bmp-start.png", bmp)
 
     while t < height and all(bmp[t, :]):
         t = t + 1
@@ -330,8 +305,6 @@ def process_page(infile,
     bmp[b, :] = False
     bmp[:, l] = False
     bmp[:, r] = False
-    imsave("bbox-start.png", bmp)
-    print("Bbox", l, t, b, r)
 
     def boxOfString(x, p):
         s = x.split(":")
@@ -510,14 +483,16 @@ def process_page(infile,
         (l, r, t, b) = (vd[2 * i + 1], vd[2 * (i + u)], hd[2 * j + 1],
                         hd[2 * (j + v)])
         ret, rect = pdfdoc.get_text(page, l - pad, t - pad, r - l, b - t)
+
         if img != None and checkcells:
             (x1,y1,x2,y2) = [rrr+pad for rrr in [rect.x1,rect.y1,rect.x2,rect.y2]]
             img[y1:y2,x1:x2] += col(random.random()).astype(uint8)
 
         return (i, j, u, v, pg, ret)
 
-    if checkcells:
+    if checkletters:
         img = (imgfloat / 2.).astype(uint8)
+
     if boxes:
         cells = [x + (pg,
                       "", ) for x in cells
@@ -526,7 +501,7 @@ def process_page(infile,
         print(cells)
         cells = [getCell(x, img) for x in cells
                  if (frow == None or (x[1] >= frow and x[1] <= lrow))]
-    if checkcells:
+    if checkletters:
         imsave("text-locations.png", img)
 
     return cells
