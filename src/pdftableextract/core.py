@@ -1,4 +1,5 @@
 import sys
+import random
 import os
 from numpy import array, fromstring, ones, zeros, uint8, diff, where, sum, delete, frombuffer, reshape, all, any
 import numpy
@@ -13,8 +14,14 @@ import csv
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('Poppler', '0.18')
-from gi.repository import Gdk, Poppler
+gi.require_version('Gdk', '3.0')
+from gi.repository import Gdk, Poppler  #, Glib
 import cairo
+
+
+def interact(locals):
+    import code
+    code.InteractiveConsole(locals=locals).interact()
 
 
 class PopplerProcessor(object):
@@ -34,11 +41,22 @@ class PopplerProcessor(object):
         self.resolution = 300
         self.greyscale_threshold = int(kwargs.get("greyscale_thresholds",
                                                   25)) * 255.0 / 100.0
+        self.layout = None
 
     def get_page(self, index):
         if index < 0 or index >= self.page_num:
             raise IndexError("page number is out of bounds")
-        return self.document.get_page(index)
+        page = self.document.get_page(index)
+        if self.layout != None:
+            #Glib.free(self.layout)
+            # Do we need freeing elements of the list # FIXME
+            self.layout = None
+        self.text = page.get_text()
+        self.attributes=page.get_text_attributes()
+        l = page.get_text_layout()
+        if l[0]:
+            self.layout = l[1]
+        return page
 
     def get_image(self, index):
         page = self.get_page(index)
@@ -46,7 +64,7 @@ class PopplerProcessor(object):
         scale = 1
         width, height = [int(x) for x in page.get_size()]
         d = self.scale = dpi / 72.
-        self.frac_scale=1/d
+        self.frac_scale = 1 / d
         pxw, pxh = int(width * d), int(height * d)
         # data=zeros((pxw,pxh,4), dtype=uint8)
         surface = cairo.ImageSurface(
@@ -98,36 +116,92 @@ class PopplerProcessor(object):
         imsave('nomask.png', nd)
         return nd, page
 
-    def print_rect(self, msg, r, page):
-        x1,y1,x2,y2= r.x1, r.y1, r.x2, r.y2
+    def print_rect(self, msg=None, r=None, page=None):
+        if None in [r, page]:
+            raise ValueError("r and page arguments are required")
+        x1, y1, x2, y2 = r.x1, r.y1, r.x2, r.y2
         x, y, w, h = x1, y1, x2 - x1, y2 - y1
-        print(msg, x, y, w, h, "---", x1,y1,x2,y2)
+        print(msg, x, y, w, h, "---", x1, y1, x2, y2)
         width, height = [int(x) for x in page.get_size()]
-        print(msg, x, height-y, w, h, "---", x1,height-y1,x2,height-y2)
+        print(msg, x, height - y, w, h, "---", x1, height - y1, x2,
+              height - y2)
+
+    def within(self, a, b, pad=0):
+        """Is Rectangle b within Rectangle a, i.e. b is in a
+        """
+        if b.x1+pad < a.x1: return False
+        if b.y1+pad < a.y1: return False
+        if b.x2-pad > a.x2: return False
+        if b.y2-pad > a.y2: return False
+        return True
+
+    def rexpand(self, rect, layout, pad=0):
+        """Make rectangle rect include layout
+
+        Arguments:
+        - `rect`: Adjustable Rectangle;
+        - `layout`: Rectangle to be included in rect.
+        """
+
+        r, l = rect, layout
+        if r.x1 > l.x1: r.x1 = l.x1-pad
+        if r.y1 > l.y1: r.y1 = l.y1-pad
+        if r.x2 < l.x2: r.x2 = l.x2+pad
+        if r.y2 < l.y2: r.y2 = l.y2+pad
 
     def get_text(self, page, x, y, w, h):
         #cb = page.get_crop_box()
         #self.print_rect("Rect crop", cb)
         width, height = [int(x) for x in page.get_size()]
         #print("Page_size", width, height)
-        print(x, y, w, h)
-        fc=self.frac_scale
-        print ("FC:",fc)
-        x,y,w,h = (z*fc for z in [x,y,w,h])
+        ##print(x, y, w, h)
+        fc = self.frac_scale
+        ##print("FC:", fc)
+        x, y, w, h = (z * fc for z in [x, y, w, h])
         rect = Poppler.Rectangle()
-        print("shifted:",x, y, w, h)
+        ##print("shifted:", x, y, w, h)
         rect.x1, rect.y1 = x, y
         rect.x2, rect.y2 = x + w, y + h
-        self.print_rect ("box:", rect, page)
+        assert rect.x1<=rect.x2
+        assert rect.y1<=rect.y2
+        #self.print_rect("box:", rect, page)
         txt = page.get_text_for_area(rect)
-        print (txt)
-        attrs=page.get_text_attributes_for_area(rect)
-        print([(a.start_index,a.end_index) for a in attrs])
-        print(help(attrs[0]))
-        wer
+        ##print(txt)
+        attrs = page.get_text_attributes_for_area(rect)
+        ##print([(a.start_index, a.end_index) for a in attrs])
+        ##print(help(attrs[0]))
+        #chars=[]
+        r = Poppler.Rectangle()
+        r.x1 = r.y1 = 1e10
+        r.x2 = r.y2 = -1e10
+        chars=[]
+        for k,l in enumerate(self.layout):
+            if self.within(rect, l, pad=1):
+                self.rexpand(r, l, pad=0.5)
+                chars.append(self.text[k])
+        txt1="".join(chars)
+        #txt1 = page.get_text_for_area(r)
+        print ((r.x1,r.y1,r.x2,r.y2),txt1)
+
+        #interact(locals={"p": page, "d": self.document, "self": self})
         #rect.free()
         #Poppler.Rectangle.free(rect)
-        return txt
+        return txt1, r
+
+    def get_rectangles_for_page(self, page):
+        """Return all rectangles for all letters in the page..
+        Used for debugging
+
+        Arguments:
+        - `page`:
+        """
+        layout=self.layout
+        if layout == None:
+            raise RuntimeError("page is not chosen")
+
+        #interact(locals={"layout":layout, "self":self})
+        answer = [(r.x1,r.y1,r.x2,r.y2) for r in layout]
+        return answer
 
 
 def colinterp(a, x):
@@ -164,6 +238,7 @@ def process_page(infile,
                  checkdivs=False,
                  checkcells=False,
                  checkall=False,
+                 checkletters=False,
                  whitespace="normalize",
                  boxes=False,
                  encoding="utf8"):
@@ -173,6 +248,7 @@ def process_page(infile,
         checklines = True
         checkdivs = True
         checkcells = True
+        checkletters = True
 
     outfile = outfilename if outfilename else "output"
     pdfdoc = PopplerProcessor(infile)
@@ -208,8 +284,18 @@ def process_page(infile,
     img[:, :, 1] = bmp * 255
     img[:, :, 2] = bmp * 255
 
-    if checkdivs or checkcells:
+    if checkdivs or checkcells or checkletters:
         imgfloat = img.astype(float)
+
+    if checkletters:
+        img = (imgfloat/2.).astype(uint8)
+        rectangles=pdfdoc.get_rectangles_for_page(pg)
+        lrn=len(rectangles)
+        for k,r in enumerate(rectangles):
+            x1,y1,x2,y2 = [k+pad+1 for k in r]
+            img[y1:y2, x1:x2] += col(random.random()).astype(uint8)
+        imsave("letters.png", img)
+
 
     #-----------------------------------------------------------------------
     # Find bounding box.
@@ -419,21 +505,30 @@ def process_page(infile,
         #-----------------------------------------------------------------------
         # fork out to extract text for each cell.
 
-    def getCell(_coordinate):
+    def getCell(_coordinate, img=None):
         (i, j, u, v) = _coordinate
         (l, r, t, b) = (vd[2 * i + 1], vd[2 * (i + u)], hd[2 * j + 1],
                         hd[2 * (j + v)])
-        ret = pdfdoc.get_text(page, l - pad, t - pad, r - l, b - t)
+        ret, rect = pdfdoc.get_text(page, l - pad, t - pad, r - l, b - t)
+        if img != None and checkcells:
+            (x1,y1,x2,y2) = [rrr+pad for rrr in [rect.x1,rect.y1,rect.x2,rect.y2]]
+            img[y1:y2,x1:x2] += col(random.random()).astype(uint8)
+
         return (i, j, u, v, pg, ret)
 
+    if checkcells:
+        img = (imgfloat / 2.).astype(uint8)
     if boxes:
         cells = [x + (pg,
                       "", ) for x in cells
                  if (frow == None or (x[1] >= frow and x[1] <= lrow))]
     else:
         print(cells)
-        cells = [getCell(x) for x in cells
+        cells = [getCell(x, img) for x in cells
                  if (frow == None or (x[1] >= frow and x[1] <= lrow))]
+    if checkcells:
+        imsave("text-locations.png", img)
+
     return cells
 
 #-----------------------------------------------------------------------
