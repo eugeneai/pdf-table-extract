@@ -21,7 +21,5 @@ li = pdf.table_to_list(cells, pages)[1]
 #row '1' contains column headings
 #data is row '2' through '-1'
 
-print (cells[:])
-
 data = pd.DataFrame(li[2:-1], columns=li[1], index=[l[0] for l in li[2:-1]])
 print(data)
