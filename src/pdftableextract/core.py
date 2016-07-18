@@ -1,7 +1,7 @@
 import sys
 import os
 
-DEBUG = False
+DEBUG = True
 
 if DEBUG:
     import random
@@ -121,11 +121,18 @@ class PopplerProcessor(object):
         - `a`, `b` : The rectangles;
         - `pad` : Additional space.
         """
-        if b.x1+pad < a.x1: return False
-        if b.y1+pad < a.y1: return False
-        if b.x2-pad > a.x2: return False
-        if b.y2-pad > a.y2: return False
-        return True
+        if b.x1>=a.x1 and b.y1>=a.y1 and b.x2<=a.x2 and b.y2<=a.y2: # The obvious case.
+            return True
+        def w(x,y):
+            if x>=a.x1+pad and x<=a.x2-pad and y>=a.y1+pad and y<=a.y2-pad:
+                return True
+            else:
+                return False
+        for x,y in [(b.x1,b.y1), (b.x2,b.y2), (b.x1,b.y2), (b.x2,b.y1)]:
+            if w(x,y):
+                return True
+        # FIXME if b is bigger a and intersects it...
+        return False
 
     def rexpand(self, rect, layout, pad=0):
         """Make rectangle rect include layout
@@ -160,8 +167,8 @@ class PopplerProcessor(object):
         r.x2 = r.y2 = -1e10
         chars=[]
         for k,l in enumerate(self.layout):
-            if self.within(rect, l, pad=1):
-                self.rexpand(r, l, pad=0.5)
+            if self.within(rect, l, pad=0):
+                self.rexpand(r, l, pad=0)
                 chars.append(self.text[k])
         txt="".join(chars)
 
@@ -275,7 +282,7 @@ def process_page(infile,
         for k,r in enumerate(rectangles):
             x1,y1,x2,y2 = [int(bitmap_resolution* float(k)/72.)+pad for k in r]
             img[y1:y2, x1:x2] += col(random.random()).astype(uint8)
-        imsave("letters.png", img)
+        imsave(outfile+"-letters.png", img)
 
 
     #-----------------------------------------------------------------------
@@ -344,7 +351,7 @@ def process_page(infile,
             img[t:b + 1, l:r + 1] = [0, 0, 0]
 
     if checkcrop:
-        imsave("crop-" + outfile + ".png", img)
+        imsave(outfile+"-crop.png", img)
 
 #-----------------------------------------------------------------------
 # Line finding section.
@@ -406,7 +413,7 @@ def process_page(infile,
 
         for j in hd:
             img[j, :] = [0, 0, 255]  # blue
-        imsave("lines-" + outfile + ".png", img)
+        imsave(outfile+"-lines.png", img)
 
         #-----------------------------------------------------------------------
         # divider checking.
@@ -436,7 +443,7 @@ def process_page(infile,
                     if isDiv(0, l, r, t, b):
                         img[t:b, l:r, 0] = 255
                         img[t:b, l:r, 2] = 0
-        imsave("divs-" + outfile + ".png", img)
+        imsave(outfile+"-divs.png", img)
 
         #-----------------------------------------------------------------------
         # Cell finding section.
@@ -476,9 +483,9 @@ def process_page(infile,
             (i, j, u, v) = cells[k]
             (l, r, t, b) = (vd[2 * i + 1], vd[2 * (i + u)], hd[2 * j + 1],
                             hd[2 * (j + v)])
-            img[t:b, l:r] += col(k / nc).astype(uint8)
+            img[t:b, l:r] += col(k*0.9 / nc + 0.1*random.random()).astype(uint8)
 
-        imsave("cells-" + outfile + ".png", img)
+        imsave(outfile+"-cells.png", img)
 
         #-----------------------------------------------------------------------
         # fork out to extract text for each cell.
@@ -506,7 +513,7 @@ def process_page(infile,
         cells = [getCell(x, img) for x in cells
                  if (frow == None or (x[1] >= frow and x[1] <= lrow))]
     if checkletters:
-        imsave("text-locations.png", img)
+        imsave(outfile+"-text-locations.png", img)
 
     return cells
 
