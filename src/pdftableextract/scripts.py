@@ -25,10 +25,10 @@ def procargs() :
   p.add_argument("-name", help="name to add to XML tag, or HTML comments")
   p.add_argument("-pad", help="imitial image pading (pixels)", type=int,
      default=2 )
-  p.add_argument("-white",action="append", 
+  p.add_argument("-white",action="append",
     help="paint white to the bitmap as left:top:right:bottom in length units."
          "Done before painting black" )
-  p.add_argument("-black",action="append", 
+  p.add_argument("-black",action="append",
     help="paint black to the bitmap as left:top:right:bottom in length units."
          "Done after poainting white" )
   p.add_argument("-bitmap", action="store_true",
@@ -67,14 +67,10 @@ def main():
         raise
     sys.exit("I/O Error running pdf-table-extract: {0}".format(e))
   except OSError as e:
-    print("An OS Error occurred running pdf-table-extract: Is `pdftoppm` installed and available?")
+    print("An OS Error occurred running pdf-table-extract")
     if args.traceback:
         raise
     sys.exit("OS Error: {0}".format(e))
-  except subprocess.CalledProcessError as e:
-    if args.traceback:
-        raise
-    sys.exit("Error while checking a subprocess call: {0}".format(e))
   except Exception as e:
     if args.traceback:
         raise
@@ -85,9 +81,9 @@ def imain(args):
     if args.checkcrop or args.checklines or args.checkdivs or args.checkcells:
         for pgs in args.page :
             success = process_page(args.infile, pgs,
-                bitmap=args.bitmap, 
-                checkcrop=args.checkcrop, 
-                checklines=args.checklines, 
+                bitmap=args.bitmap,
+                checkcrop=args.checkcrop,
+                checklines=args.checklines,
                 checkdivs=args.checkdivs,
                 checkcells=args.checkcells,
                 whitespace=args.whitespace,
@@ -105,9 +101,9 @@ def imain(args):
     else:
         for pgs in args.page :
             cells.extend(process_page(args.infile, pgs,
-                bitmap=args.bitmap, 
-                checkcrop=args.checkcrop, 
-                checklines=args.checklines, 
+                bitmap=args.bitmap,
+                checkcrop=args.checkcrop,
+                checklines=args.checklines,
                 checkdivs=args.checkdivs,
                 checkcells=args.checkcells,
                 whitespace=args.whitespace,
@@ -127,6 +123,3 @@ def imain(args):
                 args.outfile = sys.stdout
             filenames["{0}_filename".format(args.t)] = args.outfile
             output(cells, args.page, name=args.name, infile=args.infile, output_type=args.t, **filenames)
-
-
-

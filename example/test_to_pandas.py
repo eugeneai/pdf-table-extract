@@ -7,7 +7,8 @@ pages = ["1"]
 cells = [pdf.process_page("example.pdf",
                           p,
                           outfilename="pandas-test",
-                          checkall=True) for p in pages]
+                          bitmap_resolution=100,
+                          checkall=False) for p in pages]
 
 #flatten the cells structure
 cells = [item for sublist in cells for item in sublist]

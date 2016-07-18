@@ -1,12 +1,17 @@
 import sys
-import random
 import os
+
+DEBUG = False
+
+if DEBUG:
+    import random
 from numpy import array, fromstring, ones, zeros, uint8, diff, where, sum, delete, frombuffer, reshape, all, any
 import numpy
 
-import matplotlib
-matplotlib.use('AGG')
-from matplotlib.image import imsave
+if DEBUG:
+    import matplotlib
+    matplotlib.use('AGG')
+    from matplotlib.image import imsave
 
 from xml.dom.minidom import getDOMImplementation
 import json
@@ -80,13 +85,13 @@ class PopplerProcessor(object):
         context.restore()
 
         pixbuf = Gdk.pixbuf_get_from_surface(surface, 0, 0, pxw, pxh)
-        surface.write_to_png("page.png")
+        # surface.write_to_png("page.png")
         data = frombuffer(pixbuf.get_pixels(), dtype=uint8)
         R = data[0::4]
         G = data[1::4]
         B = data[2::4]
         A = data[3::4]
-        C = (R * 34 + G * 56 + B * 10) / 100. # Convert to gray
+        C = (R * 34. + G * 56. + B * 10.) / 100. # Convert to gray
 
         C = C.astype(uint8)
 
@@ -202,7 +207,7 @@ def process_page(infile,
                  page=None,
                  crop=None,
                  line_length=0.5,
-                 bitmap_resolution=72, # 300,
+                 bitmap_resolution=300,
                  name=None,
                  pad=2,
                  white=None,
@@ -268,7 +273,7 @@ def process_page(infile,
         rectangles=pdfdoc.get_rectangles_for_page(pg)
         lrn=len(rectangles)
         for k,r in enumerate(rectangles):
-            x1,y1,x2,y2 = [k+pad+1 for k in r]
+            x1,y1,x2,y2 = [int(bitmap_resolution* float(k)/72.)+pad for k in r]
             img[y1:y2, x1:x2] += col(random.random()).astype(uint8)
         imsave("letters.png", img)
 
@@ -484,8 +489,8 @@ def process_page(infile,
                         hd[2 * (j + v)])
         ret, rect = pdfdoc.get_text(page, l - pad, t - pad, r - l, b - t)
 
-        if img != None and checkcells:
-            (x1,y1,x2,y2) = [rrr+pad for rrr in [rect.x1,rect.y1,rect.x2,rect.y2]]
+        if type(img)!=type(None) and checkletters:
+            (x1,y1,x2,y2) = [int(bitmap_resolution * float(rrr)/72+pad) for rrr in [rect.x1,rect.y1,rect.x2,rect.y2]]
             img[y1:y2,x1:x2] += col(random.random()).astype(uint8)
 
         return (i, j, u, v, pg, ret)
@@ -498,7 +503,6 @@ def process_page(infile,
                       "", ) for x in cells
                  if (frow == None or (x[1] >= frow and x[1] <= lrow))]
     else:
-        print(cells)
         cells = [getCell(x, img) for x in cells
                  if (frow == None or (x[1] >= frow and x[1] <= lrow))]
     if checkletters:
