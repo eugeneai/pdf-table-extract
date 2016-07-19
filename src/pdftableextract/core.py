@@ -1,7 +1,7 @@
 import sys
 import os
 
-DEBUG = False
+DEBUG = True
 
 if DEBUG:
     import random
@@ -47,6 +47,8 @@ class PopplerProcessor(object):
         self.greyscale_threshold = int(kwargs.get("greyscale_thresholds",
                                                   25)) * 255.0 / 100.0
         self.layout = None
+        self.table_chars=set()    # Contains indexes of chars belonging to tables.
+                                  # Used to recognize text of paragraphs.
 
     def get_page(self, index):
         if index < 0 or index >= self.page_num:
@@ -58,6 +60,7 @@ class PopplerProcessor(object):
             self.layout = None
         self.text = page.get_text()
         self.attributes=page.get_text_attributes()
+        self.table_chars=set()
         l = page.get_text_layout()
         if l[0]:
             self.layout = l[1]
@@ -159,11 +162,22 @@ class PopplerProcessor(object):
             if self.overlap(rect, l, pad=0):
                 self.rexpand(r, l, pad=0)
                 chars.append(self.text[k])
+                self.table_chars.add(k)
         txt="".join(chars)
 
         # txt = page.get_text_for_area(r) # FIXME
 
         return txt, r
+
+    def get_rest_text(self):
+        """Returns the rest of a text, that is not
+        recognized as data of a table.
+        """
+        chars=[]
+        for i, char in enumerate(self.text):
+            if not i in self.table_chars:
+                chars.append(char)
+        return "".join(chars)
 
     def get_rectangles_for_page(self, page):
         """Return all rectangles for all letters in the page..
@@ -217,7 +231,9 @@ def process_page(infile,
                  checkletters=False,
                  whitespace="normalize",
                  boxes=False,
-                 encoding="utf8"):
+                 encoding="utf8",
+                 rest_text=False,    # Return the rest of text as second parameter
+):
 
     if checkall:
         checkcrop = True
@@ -229,7 +245,7 @@ def process_page(infile,
     outfile = outfilename if outfilename else "output"
     pdfdoc = PopplerProcessor(infile)
     page = page or []
-    (pg, frow, lrow) = (list(map(int, (pgs.split(":")))) + [None, None])[0:3]
+    (pg, frow, lrow) = (list(map(int, (str(pgs).split(":")))) + [None, None])[0:3]
     pdfdoc.resolution = bitmap_resolution
     pdfdoc.greyscale_threshold = greyscale_threshold
 
@@ -302,10 +318,10 @@ def process_page(infile,
         r = r + 1
 
 # Mark bounding box.
-    bmp[t, :] = False
-    bmp[b, :] = False
-    bmp[:, l] = False
-    bmp[:, r] = False
+    # bmp[t, :] = False
+    # bmp[b, :] = False
+    # bmp[:, l] = False
+    # bmp[:, r] = False
 
     def boxOfString(x, p):
         s = x.split(":")
@@ -503,7 +519,9 @@ def process_page(infile,
                  if (frow == None or (x[1] >= frow and x[1] <= lrow))]
     if checkletters:
         imsave(outfile+"-text-locations.png", img)
-
+    if rest_text:
+        text = pdfdoc.get_rest_text()
+        return cells, text
     return cells
 
 #-----------------------------------------------------------------------
@@ -520,7 +538,9 @@ def output(cells,
            table_list_filename=None,
            infile=None,
            name=None,
-           output_type=None):
+           output_type=None,
+           text=None
+):
 
     output_types = [
         dict(filename=cells_csv_filename,
@@ -546,7 +566,9 @@ def output(cells,
                               outfile=outfile,
                               name=name,
                               infile=infile,
-                              output_type=output_type)
+                              output_type=output_type,
+                              text=text
+            )
 
             if entry["filename"] != sys.stdout:
                 outfile.close()
@@ -657,41 +679,58 @@ def o_table_html(cells,
                  outfile=None,
                  output_type=None,
                  name=None,
+                 text=None,
                  infile=None):
     """Output HTML formatted table"""
 
     oj = 0
     opg = 0
-    doc = getDOMImplementation().createDocument(None, "table", None)
-    root = doc.documentElement
-    if (output_type == "table_chtml"):
-        root.setAttribute("border", "1")
-        root.setAttribute("cellspaceing", "0")
-        root.setAttribute("style", "border-spacing:0")
+    # doc = getDOMImplementation().createDocument(None, "table", None)
+    doc = getDOMImplementation().createDocument(None, "div", None)
+    div=root = doc.documentElement
+    p = doc.createElement("p")
+    if text != None and text.strip():
+        p.setAttribute("align","justify")
+        text=text.rstrip()
+        pars=text.split("\n")
+        for par in pars:
+            _div=doc.createElement("div")
+            _div.setAttribute("class", "sentence")
+            _text=doc.createTextNode(par)
+            _div.appendChild(_text)
+            p.appendChild(_div)
+        div.appendChild(p)
     nc = len(cells)
-    tr = None
-    for k in range(nc):
-        (i, j, u, v, pg, value) = cells[k]
-        if j > oj or pg > opg:
-            if pg > opg:
-                s = "Name: " + name + ", " if name else ""
-                root.appendChild(doc.createComment(s + ("Source: %s page %d." %
-                                                        (infile, pg))))
-            if tr:
-                root.appendChild(tr)
-            tr = doc.createElement("tr")
-            oj = j
-            opg = pg
-        td = doc.createElement("td")
-        if value != "":
-            td.appendChild(doc.createTextNode(value))
-        if u > 1:
-            td.setAttribute("colspan", str(u))
-        if v > 1:
-            td.setAttribute("rowspan", str(v))
-        if output_type == "table_chtml":
-            td.setAttribute("style", "background-color: #%02x%02x%02x" %
-                            tuple(128 + col(k / (nc + 0.))))
-        tr.appendChild(td)
-    root.appendChild(tr)
+    if nc>0:
+        table=doc.createElement("table")
+        div.appendChild(table)
+        if (output_type == "table_chtml"):
+            table.setAttribute("border", "1")
+            table.setAttribute("cellspacing", "0")
+            table.setAttribute("style", "border-spacing:0")
+        tr = None
+        for k in range(nc):
+            (i, j, u, v, pg, value) = cells[k]
+            if j > oj or pg > opg:
+                if pg > opg:
+                    s = "Name: " + name + ", " if name else ""
+                    table.appendChild(doc.createComment(s + ("Source: %s page %d." %
+                                                            (infile, pg))))
+                if tr:
+                    table.appendChild(tr)
+                tr = doc.createElement("tr")
+                oj = j
+                opg = pg
+            td = doc.createElement("td")
+            if value != "":
+                td.appendChild(doc.createTextNode(value))
+            if u > 1:
+                td.setAttribute("colspan", str(u))
+            if v > 1:
+                td.setAttribute("rowspan", str(v))
+            if output_type == "table_chtml":
+                td.setAttribute("style", "background-color: #%02x%02x%02x" %
+                                tuple(128 + col(k / (nc + 0.))))
+            tr.appendChild(td)
+        table.appendChild(tr)
     outfile.write(doc.toprettyxml())
