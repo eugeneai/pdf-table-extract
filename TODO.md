@@ -47,8 +47,8 @@ A flood file algorithm would make a single cell for text around
 a table, rather than the current splitting it into rectangles, but
 this would also require a graph view of cell relationships.
 
-Popplar wrapper
-===============
+Poppler wrapper (almost done)
+=============================
 A short peice of code that wrapps the poppler library to give the
 same functionality as ppmtotext but over a socket or file descriptor,
 and able to process sequential requests. At the moment pdf-extract
