@@ -1,7 +1,7 @@
 import sys
 import os
 
-DEBUG = True
+DEBUG = False
 
 if DEBUG:
     import random
@@ -114,25 +114,14 @@ class PopplerProcessor(object):
         print(msg, x, height - y, w, h, "---", x1, height - y1, x2,
               height - y2)
 
-    def within(self, a, b, pad=0):
-        """Is Rectangle b within Rectangle a, i.e. b is in a.
+    def overlap(self, a, b, pad=0):
+        """Check if Rectangle b and Rectangle overlaps.
 
         Arguments:
         - `a`, `b` : The rectangles;
-        - `pad` : Additional space.
+        - `pad` : Additional space. (IGNORED)
         """
-        if b.x1>=a.x1 and b.y1>=a.y1 and b.x2<=a.x2 and b.y2<=a.y2: # The obvious case.
-            return True
-        def w(x,y):
-            if x>=a.x1+pad and x<=a.x2-pad and y>=a.y1+pad and y<=a.y2-pad:
-                return True
-            else:
-                return False
-        for x,y in [(b.x1,b.y1), (b.x2,b.y2), (b.x1,b.y2), (b.x2,b.y1)]:
-            if w(x,y):
-                return True
-        # FIXME if b is bigger a and intersects it...
-        return False
+        return a.x1 < b.x2 and a.x2 > b.x1 and a.y1 < b.y2 and a.y2 > b.y1
 
     def rexpand(self, rect, layout, pad=0):
         """Make rectangle rect include layout
@@ -167,7 +156,7 @@ class PopplerProcessor(object):
         r.x2 = r.y2 = -1e10
         chars=[]
         for k,l in enumerate(self.layout):
-            if self.within(rect, l, pad=0):
+            if self.overlap(rect, l, pad=0):
                 self.rexpand(r, l, pad=0)
                 chars.append(self.text[k])
         txt="".join(chars)
