@@ -14,6 +14,7 @@ gi.require_version('Poppler', '0.18')
 gi.require_version('Gdk', '3.0')
 from gi.repository import Gdk, Poppler  #, Glib
 import cairo
+import collections
 
 
 def interact(locals):
@@ -42,8 +43,8 @@ class PopplerProcessor(object):
         self.greyscale_threshold = int(kwargs.get("greyscale_thresholds",
                                                   25)) * 255.0 / 100.0
         self.layout = None
-        self.table_chars=set()    # Contains indexes of chars belonging to tables.
-                                  # Used to recognize text of paragraphs.
+        self.table_chars = set()  # Contains indexes of chars belonging to tables.
+        # Used to recognize text of paragraphs.
 
     def get_page(self, index):
         if index < 0 or index >= self.page_num:
@@ -54,8 +55,8 @@ class PopplerProcessor(object):
             # Do we need freeing elements of the list # FIXME
             self.layout = None
         self.text = page.get_text()
-        self.attributes=page.get_text_attributes()
-        self.table_chars=set()
+        self.attributes = page.get_text_attributes()
+        self.table_chars = set()
         l = page.get_text_layout()
         if l[0]:
             self.layout = l[1]
@@ -89,7 +90,7 @@ class PopplerProcessor(object):
         G = data[1::4]
         B = data[2::4]
         A = data[3::4]
-        C = (R * 34. + G * 56. + B * 10.) / 100. # Convert to gray
+        C = (R * 34. + G * 56. + B * 10.) / 100.  # Convert to gray
 
         C = C.astype(uint8)
 
@@ -130,10 +131,10 @@ class PopplerProcessor(object):
         """
 
         r, l = rect, layout
-        if r.x1 > l.x1: r.x1 = l.x1-pad
-        if r.y1 > l.y1: r.y1 = l.y1-pad
-        if r.x2 < l.x2: r.x2 = l.x2+pad
-        if r.y2 < l.y2: r.y2 = l.y2+pad
+        if r.x1 > l.x1: r.x1 = l.x1 - pad
+        if r.y1 > l.y1: r.y1 = l.y1 - pad
+        if r.x2 < l.x2: r.x2 = l.x2 + pad
+        if r.y2 < l.y2: r.y2 = l.y2 + pad
 
     def get_text(self, page, x, y, w, h):
         width, height = [int(x) for x in page.get_size()]
@@ -142,8 +143,8 @@ class PopplerProcessor(object):
         rect = Poppler.Rectangle()
         rect.x1, rect.y1 = x, y
         rect.x2, rect.y2 = x + w, y + h
-        assert rect.x1<=rect.x2
-        assert rect.y1<=rect.y2
+        assert rect.x1 <= rect.x2
+        assert rect.y1 <= rect.y2
 
         # Could not make it work correctly # FIXME
         # txt = page.get_text_for_area(rect)
@@ -152,13 +153,13 @@ class PopplerProcessor(object):
         r = Poppler.Rectangle()
         r.x1 = r.y1 = 1e10
         r.x2 = r.y2 = -1e10
-        chars=[]
-        for k,l in enumerate(self.layout):
+        chars = []
+        for k, l in enumerate(self.layout):
             if self.overlap(rect, l, pad=0):
                 self.rexpand(r, l, pad=0)
                 chars.append(self.text[k])
                 self.table_chars.add(k)
-        txt="".join(chars)
+        txt = "".join(chars)
 
         # txt = page.get_text_for_area(r) # FIXME
 
@@ -168,7 +169,7 @@ class PopplerProcessor(object):
         """Returns the rest of a text, that is not
         recognized as data of a table.
         """
-        chars=[]
+        chars = []
         for i, char in enumerate(self.text):
             if not i in self.table_chars:
                 chars.append(char)
@@ -181,11 +182,11 @@ class PopplerProcessor(object):
         Arguments:
         - `page`: referece to page
         """
-        layout=self.layout
+        layout = self.layout
         if layout == None:
             raise RuntimeError("page is not chosen")
 
-        answer = [(r.x1,r.y1,r.x2,r.y2) for r in layout]
+        answer = [(r.x1, r.y1, r.x2, r.y2) for r in layout]
         return answer
 
 
@@ -205,6 +206,7 @@ def col(x, colmult=1.0):
     """colors"""
     return colinterp(colarr, (colmult * x) % 1.0) / 2
 
+
 class Page(object):
     """Introduces page data, e.g.,
     text bounding box, cells, table locations, i.e.,
@@ -214,8 +216,7 @@ class Page(object):
     def __init__(self):
         """
         """
-        self.layout=[]
-
+        self.layout = []
 
 
 class Extractor(object):
@@ -225,7 +226,7 @@ class Extractor(object):
 
     def __init__(self,
                  infile,
-                 pgs,
+                 pgs=None,
                  startpage=None,
                  endpage=None,
                  outfilename=None,
@@ -250,87 +251,100 @@ class Extractor(object):
                  encoding="utf8",
                  rest_text=False,    # Return the rest of text as second parameter):
                  notify=None,
-                 imshow=None,
+                 imsave=None,
                  ):
-        debug=False
-        self.infile=infile
-        self.pgs=pgs
-        self.startpage=startpage
-        self.endpage=endpage
-        self.outfilename=outfilename
-        self.greyscale_threshold=greyscale_threshold
-        self.page=page
-        self.crop=crop
-        self.line_length=line_length
-        self.bitmap_resolution=bitmap_resolution
-        self.name=name
-        self.pad=pad
-        self.white=white
-        self.black=black
-        self.bitmap=bitmap
+        debug = False
+        self.infile = infile
+        self.pgs = pgs
+        self.startpage = startpage
+        self.endpage = endpage
+        self.outfilename = outfilename
+        self.greyscale_threshold = greyscale_threshold
+        self.page = page
+        self.crop = crop
+        self.line_length = line_length
+        self.bitmap_resolution = bitmap_resolution
+        self.name = name
+        self.pad = pad
+        self.white = white
+        self.black = black
+        self.bitmap = bitmap
         if checkall:
-            checkcrop=True
-            checklines=True
-            checkdivs=True
-            checkcells=True
-            checkletters=True
-        self.checkcrop=checkcrop
-        self.checklines=checklines
-        self.checkdivs=checkdivs
-        self.checkcells=checkcells
-        self.checkletters=checkletters
-        self.checkall=checkall
-        checkany=False
+            checkcrop = True
+            checklines = True
+            checkdivs = True
+            checkcells = True
+            checkletters = True
+        self.checkcrop = checkcrop
+        self.checklines = checklines
+        self.checkdivs = checkdivs
+        self.checkcells = checkcells
+        self.checkletters = checkletters
+        self.checkall = checkall
+        checkany = False
         if checkcrop or checklines or checkdivs or checkcells or checkletters:
             debug = True
             checkany = True
-        self.whitespace=whitespace
-        self.boxes=boxes
-        self.encoding=encoding
-        self.rest_text=rest_text
-        self.notify=notify
-        self.imshow=imshow
+        self.whitespace = whitespace
+        self.boxes = boxes
+        self.encoding = encoding
+        self.rest_text = rest_text
+        self.notify = notify
+        self.imsave = imsave
 
-        if imshow != None:
-            debug=True
+        if imsave != None:
+            debug = True
 
         if debug:
-            if imshow == None:
+            if imsave == None:
                 raise RuntimeError("did not set image saving function")
             if not checkany:
                 raise RuntimeError("did not set what pictures to be shown")
 
-        self.debug=debug
-        self.checkany=checkany
+        self.debug = debug
+        self.checkany = checkany
 
         self.outfile = outfilename if outfilename else "output"
-        self.pgs = self.frow, self.lrow = (list(map(int, (str(pgs).split(":")))) + [None, None])[0:3]
 
+        if pgs != None:
+            self.pgs = self.frow, self.lrow = (
+                list(map(int, (str(pgs).split(":")))) + [None, None])[0:3]
+        else:
+            self.pgs = range(startpage, endpage + 1)
 
     def initialize(self):
         """Initializes internal structures.
         """
-        pdfdoc=self.pdfdoc=PopplerProcessor(infile)
-        pdfdoc.resolution = bitmap_resolution
-        pdfdoc.greyscale_threshold = greyscale_threshold
-        self.pages={}
+        pdfdoc = self.pdfdoc = PopplerProcessor(self.infile)
+        pdfdoc.resolution = self.bitmap_resolution
+        pdfdoc.greyscale_threshold = self.greyscale_threshold
+        self.pages = collections.OrderedDict()
 
     def process(self, notify=None):
         """Process the PDF file sending page number to
         `notify` function.
         """
-        pag=self.start_page
+        self.initialize()
+        for page in self.pgs:
+            if notify != None:
+                notify(page)
+            if self.notify != None:
+                self.notify(page)
+            #self.process_page(page)
 
     def process_page(self, pg):
 
-        pdfdoc= self.pdfdoc
+        pdfdoc = self.pdfdoc
 
         data, page = pdfdoc.get_image(pg - 1)  # Page numbers are 0-based.
+
+        curr_page = self.pages[pg] = Page()
 
         #-----------------------------------------------------------------------
         # image load section.
 
-        height, width = data.shape[:2]  # If not to reduce to gray, the shape will be (,,3) or (,,4).
+        height, width = data.shape[:
+                                   2]  # If not to reduce to gray, the shape will be (,,3) or (,,4).
 
         pad = int(self.pad)
         height += pad * 2
@@ -339,31 +353,36 @@ class Extractor(object):
         # reimbed image with a white pad.
         bmp = ones((height, width), dtype=bool)
 
-        thr = int(255.0 * greyscale_threshold / 100.0)
+        thr = int(255.0 * self.greyscale_threshold / 100.0)
 
         bmp[pad:height - pad, pad:width - pad] = (data[:, :] > thr)
 
-        # Set up Debuging image.
-        img = zeros((height, width, 3), dtype=uint8)
+        checkany = self.checkany
 
-        # img[:, :, :] = bmp * 255 # In case of colored input image
+        if checkany:
+            # Set up Debuging image.
+            img = zeros((height, width, 3), dtype=uint8)
 
-        img[:, :, 0] = bmp * 255
-        img[:, :, 1] = bmp * 255
-        img[:, :, 2] = bmp * 255
+            # img[:, :, :] = bmp * 255 # In case of colored input image
 
-        if checkdivs or checkcells or checkletters:
-            imgfloat = img.astype(float)
+            img[:, :, 0] = bmp * 255
+            img[:, :, 1] = bmp * 255
+            img[:, :, 2] = bmp * 255
 
-        if checkletters:  # Show bounding boxes for each text object.
-            img = (imgfloat/2.).astype(uint8)
-            rectangles=pdfdoc.get_rectangles_for_page(pg)
-            lrn=len(rectangles)
-            for k,r in enumerate(rectangles):
-                x1,y1,x2,y2 = [int(bitmap_resolution* float(k)/72.)+pad for k in r]
-                img[y1:y2, x1:x2] += col(random.random()).astype(uint8)
-                imsave(outfile+"-letters.png", img)
+            if checkdivs or checkcells or checkletters:
+                imgfloat = img.astype(float)
 
+            if checkletters:  # Show bounding boxes for each text object.
+                img = (imgfloat / 2.).astype(uint8)
+                rectangles = pdfdoc.get_rectangles_for_page(pg)
+                lrn = len(rectangles)
+                for k, r in enumerate(rectangles):
+                    x1, y1, x2, y2 = [
+                        int(bitmap_resolution * float(k) / 72.) + pad
+                        for k in r
+                    ]
+                    img[y1:y2, x1:x2] += col(random.random()).astype(uint8)
+                    imsave(outfile + "-letters.png", img)
 
         #-----------------------------------------------------------------------
         # Find bounding box.
@@ -392,46 +411,52 @@ class Extractor(object):
         if r < width - 1:
             r = r + 1
 
-    # Mark bounding box.
-    # bmp[t, :] = False
-    # bmp[b, :] = False
-    # bmp[:, l] = False
-    # bmp[:, r] = False
+        curr_page.bounding_box = [int(_i - pad) for _i in [l, t, r, b]]
+
+        # Mark bounding box.
+        # bmp[t, :] = False
+        # bmp[b, :] = False
+        # bmp[:, l] = False
+        # bmp[:, r] = False
 
         def boxOfString(x, p):
             s = x.split(":")
             if len(s) < 4:
-                raise ValueError("boxes have format left:top:right:bottom[:page]")
-            return ([bitmap_resolution * float(x) + pad for x in s[0:4]] +
+                raise ValueError(
+                    "boxes have format left:top:right:bottom[:page]")
+            return ([self.bitmap_resolution * float(x) + pad for x in s[0:4]] +
                     [p if len(s) < 5 else int(s[4])])
 
     # translate crop to paint white.
 
         whites = []
-        if crop:
-            (l, t, r, b, p) = boxOfString(crop, pg)
+        curr_page.whites = whites
+        if self.crop:
+            (l, t, r, b, p) = boxOfString(self.crop, pg)
             whites.extend([(0, 0, l, height, p), (0, 0, width, t, p),
                            (r, 0, width, height, p), (0, b, width, height, p)])
 
     # paint white ...
-        if white:
+        if self.white:
             whites.extend([boxOfString(b, pg) for b in white])
 
         for (l, t, r, b, p) in whites:
             if p == pg:
                 bmp[t:b + 1, l:r + 1] = 1
-                img[t:b + 1, l:r + 1] = [255, 255, 255]
+                if checkany:
+                    img[t:b + 1, l:r + 1] = [255, 255, 255]
 
     # paint black ...
-        if black:
-            for b in black:
-                (l, t, r,
-                 b) = [bitmap_resolution * float(x) + pad for x in b.split(":")]
+        if self.black:
+            for b in self.black:
+                (l, t, r, b) = [self.bitmap_resolution * float(x) + pad
+                                for x in b.split(":")]
                 bmp[t:b + 1, l:r + 1] = 0
-                img[t:b + 1, l:r + 1] = [0, 0, 0]
+                if checkany:
+                    img[t:b + 1, l:r + 1] = [0, 0, 0]
 
-        if checkcrop:
-            imsave(outfile+"-crop.png", img)
+        if self.checkcrop:
+            self.imsave(outfile + "-crop.png", img)
 
     #-----------------------------------------------------------------------
     # Line finding section.
@@ -439,7 +464,7 @@ class Extractor(object):
     # Find all vertical or horizontal lines that are more than lthresh
     # long, these are considered lines on the table grid.
 
-        lthresh = int(line_length * bitmap_resolution)
+        lthresh = int(self.line_length * self.bitmap_resolution)
         vs = zeros(width, dtype=uint8)
 
         for i in range(width):
@@ -487,13 +512,13 @@ class Extractor(object):
             else:
                 j = j + 2
 
-        if checklines:
+        if self.checklines:
             for i in vd:
                 img[:, i] = [255, 0, 0]  # red
 
             for j in hd:
                 img[j, :] = [0, 0, 255]  # blue
-                imsave(outfile+"-lines.png", img)
+                self.imsave(outfile + "-lines.png", img)
 
             #-----------------------------------------------------------------------
             # divider checking.
@@ -506,7 +531,7 @@ class Extractor(object):
             # if any col or row (in axis) is all zeros ...
             return sum(sum(bmp[t:b, l:r], axis=a) == 0) > 0
 
-        if checkdivs:
+        if self.checkdivs:
             img = (imgfloat / 2).astype(uint8)
             for j in range(0, len(hd), 2):
                 for i in range(0, len(vd), 2):
@@ -523,7 +548,7 @@ class Extractor(object):
                         if isDiv(0, l, r, t, b):
                             img[t:b, l:r, 0] = 255
                             img[t:b, l:r, 2] = 0
-                            imsave(outfile+"-divs.png", img)
+                            self.imsave(outfile + "-divs.png", img)
 
             #-----------------------------------------------------------------------
             # Cell finding section.
@@ -547,8 +572,9 @@ class Extractor(object):
                     while 2 + (j + v) * 2 < len(hd) and not bot:
                         bot = False
                         for k in range(1, u + 1):
-                            bot |= isDiv(1, vd[2 * (i + k) - 1], vd[2 * (i + k)],
-                                         hd[2 * (j + v)], hd[2 * (j + v) + 1])
+                            bot |= isDiv(1, vd[2 * (i + k) - 1],
+                                         vd[2 * (i + k)], hd[2 * (j + v)],
+                                         hd[2 * (j + v) + 1])
                         if not bot:
                             v = v + 1
                             cells.append((i, j, u, v))
@@ -556,16 +582,17 @@ class Extractor(object):
                             i = i + 1
                             j = j + 1
 
-        if checkcells:
+        if self.checkcells:
             nc = len(cells) + 0.
             img = (imgfloat / 2.).astype(uint8)
             for k in range(len(cells)):
                 (i, j, u, v) = cells[k]
                 (l, r, t, b) = (vd[2 * i + 1], vd[2 * (i + u)], hd[2 * j + 1],
                                 hd[2 * (j + v)])
-                img[t:b, l:r] += col(k*0.9 / nc + 0.1*random.random()).astype(uint8)
+                img[t:b, l:r] += col(k * 0.9 / nc + 0.1 * random.random(
+                )).astype(uint8)
 
-            imsave(outfile+"-cells.png", img)
+            self.imsave(outfile + "-cells.png", img)
 
             #-----------------------------------------------------------------------
             # fork out to extract text for each cell.
@@ -576,27 +603,43 @@ class Extractor(object):
                             hd[2 * (j + v)])
             ret, rect = pdfdoc.get_text(page, l - pad, t - pad, r - l, b - t)
 
-            if type(img)!=type(None) and checkletters:
-                (x1,y1,x2,y2) = [int(bitmap_resolution * float(rrr)/72+pad) for rrr in [rect.x1,rect.y1,rect.x2,rect.y2]]
-                img[y1:y2,x1:x2] += col(random.random()).astype(uint8)
+            if type(img) != type(None) and self.checkletters:
+                (x1, y1, x2, y2) = [
+                    int(self.bitmap_resolution * float(rrr) / 72 + pad)
+                    for rrr in [rect.x1, rect.y1, rect.x2, rect.y2]
+                ]
+                img[y1:y2, x1:x2] += col(random.random()).astype(uint8)
 
             return (i, j, u, v, pg, ret)
 
-        if checkletters:
+        if self.checkletters:
             img = (imgfloat / 2.).astype(uint8)
 
-        if boxes:
+        if self.boxes:
             cells = [x + (pg,
                           "", ) for x in cells
                      if (frow == None or (x[1] >= frow and x[1] <= lrow))]
         else:
             cells = [getCell(x, img) for x in cells
                      if (frow == None or (x[1] >= frow and x[1] <= lrow))]
-        if checkletters:
-            imsave(outfile+"-text-locations.png", img)
-        if rest_text:
+        if self.checkletters:
+            self.imsave(outfile + "-text-locations.png", img)
+        if self.rest_text:
             text = pdfdoc.get_rest_text()
-            return cells, text
+            self._cells = cells
+            self._text = text
+        else:
+            self._cells = cells
+            self._text = None
+        curr_page.cells = cells
+        curr_page._text = text
+
+    def cells(self):
+        """Return all the cells found.
+        """
+        cells = []
+        for p in self.pages.values():
+            cells.extend(p.cells)
         return cells
 
 #-----------------------------------------------------------------------
@@ -614,8 +657,7 @@ def output(cells,
            infile=None,
            name=None,
            output_type=None,
-           text=None
-):
+           text=None):
 
     output_types = [
         dict(filename=cells_csv_filename,
@@ -642,8 +684,7 @@ def output(cells,
                               name=name,
                               infile=infile,
                               output_type=output_type,
-                              text=text
-            )
+                              text=text)
 
             if entry["filename"] != sys.stdout:
                 outfile.close()
@@ -762,22 +803,22 @@ def o_table_html(cells,
     opg = 0
     # doc = getDOMImplementation().createDocument(None, "table", None)
     doc = getDOMImplementation().createDocument(None, "div", None)
-    div=root = doc.documentElement
+    div = root = doc.documentElement
     p = doc.createElement("p")
     if text != None and text.strip():
-        p.setAttribute("align","justify")
-        text=text.rstrip()
-        pars=text.split("\n")
+        p.setAttribute("align", "justify")
+        text = text.rstrip()
+        pars = text.split("\n")
         for par in pars:
-            _div=doc.createElement("div")
+            _div = doc.createElement("div")
             _div.setAttribute("class", "sentence")
-            _text=doc.createTextNode(par)
+            _text = doc.createTextNode(par)
             _div.appendChild(_text)
             p.appendChild(_div)
         div.appendChild(p)
     nc = len(cells)
-    if nc>0:
-        table=doc.createElement("table")
+    if nc > 0:
+        table = doc.createElement("table")
         div.appendChild(table)
         if (output_type == "table_chtml"):
             table.setAttribute("border", "1")
@@ -789,8 +830,8 @@ def o_table_html(cells,
             if j > oj or pg > opg:
                 if pg > opg:
                     s = "Name: " + name + ", " if name else ""
-                    table.appendChild(doc.createComment(s + ("Source: %s page %d." %
-                                                            (infile, pg))))
+                    table.appendChild(doc.createComment(s + (
+                        "Source: %s page %d." % (infile, pg))))
                 if tr:
                     table.appendChild(tr)
                 tr = doc.createElement("tr")
@@ -811,16 +852,11 @@ def o_table_html(cells,
     outfile.write(doc.toprettyxml())
 
 
-def process_page(infile,
-                 pgs,
-                 **kwargs):
+def process_page(infile, pgs, **kwargs):
     """Performs extraction. It is API function of the
     previous version of the library.
     """
-    ext=Extractor(
-        infile=infile,
-        pgs=pgs,
-        **kwargs)
+    ext = Extractor(infile=infile, pgs=pgs, **kwargs)
 
     ext.process()
 
