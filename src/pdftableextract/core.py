@@ -307,8 +307,9 @@ class Extractor(object):
         self.outfile = outfilename if outfilename else "output"
 
         if pgs != None:
-            self.pgs = self.frow, self.lrow = (
+            pgs, self.frow, self.lrow = (
                 list(map(int, (str(pgs).split(":")))) + [None, None])[0:3]
+            self.pgs = range(pgs, pgs + 1)
         else:
             self.pgs = range(startpage, endpage + 1)
 
@@ -361,7 +362,7 @@ class Extractor(object):
 
         if checkany:
             import random
-            outfile = self.outfile+"-{:04d}".format(pg)
+            outfile = self.outfile + "-{:04d}".format(pg)
             # Set up Debuging image.
             img = zeros((height, width, 3), dtype=uint8)
 
@@ -430,7 +431,7 @@ class Extractor(object):
                     [p if len(s) < 5 else int(s[4])])
 
         if checkany:
-            print ("Bounding box(l,b,r,t): {}".format((l,b,r,t)))
+            print("Bounding box(l,b,r,t): {}".format((l, b, r, t)))
 
     # translate crop to paint white.
 
@@ -469,12 +470,10 @@ class Extractor(object):
     # Find all vertical or horizontal lines that are more than lthresh
     # long, these are considered lines on the table grid.
 
-        import pdb; pdb.set_trace()
-
         lthresh = int(self.line_length * self.bitmap_resolution)
         vs = zeros(width, dtype=uint8)
-        vd=[]
-        for i in range(l,r+1):
+
+        for i in range(l, r + 1):
             dd = diff(where(bmp[:, i])[0])
             if len(dd) > 0:
                 v = max(dd)
@@ -484,11 +483,11 @@ class Extractor(object):
                 # it was a solid black line.
                 if all(bmp[0, i]) == 0:
                     vs[i] = 1
-                    vd = (where(diff(vs[:]))[0] + 1)
+        vd = (where(diff(vs[:]))[0] + 1)
 
         hs = zeros(height, dtype=uint8)
-        hd=[]
-        for j in range(t,b+1):
+
+        for j in range(t, b + 1):
             dd = diff(where(bmp[j, :])[0])
             if len(dd) > 0:
                 h = max(dd)
@@ -498,7 +497,7 @@ class Extractor(object):
                 # it was a solid black line.
                 if all(bmp[j, 0]) == 0:
                     hs[j] = 1
-                    hd = (where(diff(hs[:]))[0] + 1)
+        hd = (where(diff(hs[:]))[0] + 1)
 
         #-----------------------------------------------------------------------
         # Look for dividors that are too large.
@@ -576,7 +575,7 @@ class Extractor(object):
                           not isDiv( 0, vd[ 2*(i+u) ], vd[ 2*(i+u)+1],
                                      hd[ 2*(j+v)-1 ], hd[ 2*(j+v) ] ):
                         u = u + 1
-                        bot = False
+                    bot = False
                     while 2 + (j + v) * 2 < len(hd) and not bot:
                         bot = False
                         for k in range(1, u + 1):
@@ -585,10 +584,10 @@ class Extractor(object):
                                          hd[2 * (j + v) + 1])
                         if not bot:
                             v = v + 1
-                            cells.append((i, j, u, v))
-                            touched[j:j + v, i:i + u] = True
-                            i = i + 1
-                            j = j + 1
+                    cells.append((i, j, u, v))
+                    touched[j:j + v, i:i + u] = True
+                i = i + 1
+            j = j + 1
 
         if self.checkcells:
             nc = len(cells) + 0.
@@ -605,13 +604,13 @@ class Extractor(object):
             #-----------------------------------------------------------------------
             # fork out to extract text for each cell.
 
-        def getCell(_coordinate, img=None):
+        def getCell(_coordinate):
             (i, j, u, v) = _coordinate
             (l, r, t, b) = (vd[2 * i + 1], vd[2 * (i + u)], hd[2 * j + 1],
                             hd[2 * (j + v)])
             ret, rect = pdfdoc.get_text(page, l - pad, t - pad, r - l, b - t)
 
-            if type(img) != type(None) and self.checkletters:
+            if self.checkletters:
                 (x1, y1, x2, y2) = [
                     int(self.bitmap_resolution * float(rrr) / 72 + pad)
                     for rrr in [rect.x1, rect.y1, rect.x2, rect.y2]
@@ -623,13 +622,15 @@ class Extractor(object):
         if self.checkletters:
             img = (imgfloat / 2.).astype(uint8)
 
+        lrow, frow = self.lrow, self.frow
         if self.boxes:
             cells = [x + (pg,
                           "", ) for x in cells
                      if (frow == None or (x[1] >= frow and x[1] <= lrow))]
         else:
-            cells = [getCell(x, img) for x in cells
+            cells = [getCell(x) for x in cells
                      if (frow == None or (x[1] >= frow and x[1] <= lrow))]
+
         if self.checkletters:
             self.imsave(outfile + "-text-locations.png", img)
         if self.rest_text:
@@ -638,7 +639,7 @@ class Extractor(object):
             self._text = text
         else:
             self._cells = cells
-            text=self._text = None
+            text = self._text = None
         curr_page.cells = cells
         curr_page._text = text
 
