@@ -312,6 +312,7 @@ class Extractor(object):
             self.pgs = range(pgs, pgs + 1)
         else:
             self.pgs = range(startpage, endpage + 1)
+            self.frow=self.lrow=None
 
     def initialize(self):
         """Initializes internal structures.
@@ -643,13 +644,44 @@ class Extractor(object):
         curr_page.cells = cells
         curr_page._text = text
 
-    def cells(self):
+    def cells(self, pg):
         """Return all the cells found.
         """
+        if pg!=None:
+            return self.pages[pg].cells
         cells = []
         for p in self.pages.values():
             cells.extend(p.cells)
         return cells
+
+    def texts(self, pg):
+        """Return all the cells found.
+        """
+        if pg!=None:
+            return self.pages[pg].text
+        texts= []
+        for p in self.pages.values():
+            texts.extend(p.text)
+        return "".join(texts)
+
+    def output(self,
+           pgs=None,
+           cells_csv_filename=None,
+           cells_json_filename=None,
+           cells_xml_filename=None,
+           table_csv_filename=None,
+           table_html_filename=None,
+           table_list_filename=None,
+           infile=None,
+           name=None,
+           output_type=None):
+        """Output recognition result in various
+        formats defined by parameters.
+        """
+        for pg, page in self.pages.items():
+            cells=self.cells(pg)
+            text=self.texts(pg)
+
 
 #-----------------------------------------------------------------------
 #output section.
