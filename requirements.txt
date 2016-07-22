@@ -1,4 +1,5 @@
 ruamel.venvgtk
+lxml
 numpy
 matplotlib
 pandas

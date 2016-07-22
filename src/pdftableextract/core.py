@@ -1,19 +1,11 @@
 import sys
 import os
 
-DEBUG = True
-
-if DEBUG:
-    import random
 from numpy import array, fromstring, ones, zeros, uint8, diff, where, sum, delete, frombuffer, reshape, all, any
 import numpy
 
-if DEBUG:
-    import matplotlib
-    matplotlib.use('AGG')
-    from matplotlib.image import imsave
-
-from xml.dom.minidom import getDOMImplementation
+#from xml.dom.minidom import getDOMImplementation
+from lxml import etree
 import json
 import csv
 import gi
@@ -25,12 +17,15 @@ import cairo
 
 
 def interact(locals):
+    """Starts interactive console,
+    Used for debugging.
+    """
     import code
     code.InteractiveConsole(locals=locals).interact()
 
 
 class PopplerProcessor(object):
-    """Class for processing PDF. That's simple.
+    """Class for processing PDF.
     It does two functions.
     1. Renders a page as a PNM graphics, and
     2. Get text in a rectangular bounding box.
@@ -209,6 +204,90 @@ colarr = array(
 def col(x, colmult=1.0):
     """colors"""
     return colinterp(colarr, (colmult * x) % 1.0) / 2
+
+class Extractor(object):
+    """Extracts PDF content as whole or
+    page by page.
+    """
+
+    def __init__(self,
+                 infile,
+                 pgs,
+                 startpage=None,
+                 endpage=None,
+                 outfilename=None,
+                 greyscale_threshold=25,
+                 page=None,
+                 crop=None,
+                 line_length=0.5,
+                 bitmap_resolution=300,
+                 name=None,
+                 pad=2,
+                 white=None,
+                 black=None,
+                 bitmap=False,
+                 checkcrop=False,
+                 checklines=False,
+                 checkdivs=False,
+                 checkcells=False,
+                 checkall=False,
+                 checkletters=False,
+                 whitespace="normalize",
+                 boxes=False,
+                 encoding="utf8",
+                 rest_text=False,    # Return the rest of text as second parameter):
+                 notify=None,
+                 imshow=None,
+                 ):
+        self.infile=infile
+        self.pgs=pgs
+		self.startpage=startpage
+		self.endpage=endpage
+		self.outfilename=outfilename
+        self.greyscale_threshold=greyscale_threshold
+		self.page=page
+		self.crop=crop
+        self.line_length=line_length
+        self.bitmap_resolution=bitmap_resolution
+		self.name=name
+		self.pad=pad
+		self.white=white
+		self.black=black
+		self.bitmap=bitmap
+        if checkall:
+            checkcrop=True
+            checklines=True
+            checkdivs=True
+            checkcells=True
+            checkletters=True
+		self.checkcrop=checkcrop
+		self.checklines=checklines
+		self.checkdivs=checkdivs
+		self.checkcells=checkcells
+		self.checkletters=checkletters
+		self.checkall=checkall
+		self.whitespace=whitespace
+		self.boxes=boxes
+		self.encoding=encoding
+        self.rest_text=rest_text
+		self.notify=notify
+        self.imshow=imshow
+        if imshow != None:
+            self.debug=True
+
+    def initialize(self):
+        """Initializes internal structures.
+        """
+        self.
+
+    def process(self, notify=None):
+        """Process the PDF file sending page number to
+        `notify` function.
+        """
+
+
+
+
 
 def process_page(infile,
                  pgs,

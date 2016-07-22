@@ -7,7 +7,7 @@ README = open(os.path.join(here, 'README.md')).read()
 
 version = '0.1'
 
-install_requires = ["numpy", "ruamel.venvgtk"]
+install_requires = ["numpy", "ruamel.venvgtk", "lxml"]
 
 
 setup(name='pdf-table-extract',
