@@ -644,7 +644,7 @@ class Extractor(object):
         curr_page.cells = cells
         curr_page._text = text
 
-    def cells(self, pg):
+    def cells(self, pg=None):
         """Return all the cells found.
         """
         if pg!=None:
@@ -654,7 +654,7 @@ class Extractor(object):
             cells.extend(p.cells)
         return cells
 
-    def texts(self, pg):
+    def texts(self, pg=None):
         """Return all the cells found.
         """
         if pg!=None:
