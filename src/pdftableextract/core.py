@@ -330,7 +330,7 @@ class Extractor(object):
                 notify(page)
             if self.notify != None:
                 self.notify(page)
-            #self.process_page(page)
+            self.process_page(page)
 
     def process_page(self, pg):
 
@@ -360,6 +360,8 @@ class Extractor(object):
         checkany = self.checkany
 
         if checkany:
+            import random
+            outfile = self.outfile+"-{:04d}".format(pg)
             # Set up Debuging image.
             img = zeros((height, width, 3), dtype=uint8)
 
@@ -369,20 +371,20 @@ class Extractor(object):
             img[:, :, 1] = bmp * 255
             img[:, :, 2] = bmp * 255
 
-            if checkdivs or checkcells or checkletters:
+            if self.checkdivs or self.checkcells or self.checkletters:
                 imgfloat = img.astype(float)
 
-            if checkletters:  # Show bounding boxes for each text object.
+            if self.checkletters:  # Show bounding boxes for each text object.
                 img = (imgfloat / 2.).astype(uint8)
                 rectangles = pdfdoc.get_rectangles_for_page(pg)
                 lrn = len(rectangles)
                 for k, r in enumerate(rectangles):
                     x1, y1, x2, y2 = [
-                        int(bitmap_resolution * float(k) / 72.) + pad
+                        int(self.bitmap_resolution * float(k) / 72.) + pad
                         for k in r
                     ]
                     img[y1:y2, x1:x2] += col(random.random()).astype(uint8)
-                    imsave(outfile + "-letters.png", img)
+                self.imsave(outfile + "-letters.png", img)
 
         #-----------------------------------------------------------------------
         # Find bounding box.
@@ -427,6 +429,9 @@ class Extractor(object):
             return ([self.bitmap_resolution * float(x) + pad for x in s[0:4]] +
                     [p if len(s) < 5 else int(s[4])])
 
+        if checkany:
+            print ("Bounding box(l,b,r,t): {}".format((l,b,r,t)))
+
     # translate crop to paint white.
 
         whites = []
@@ -464,10 +469,12 @@ class Extractor(object):
     # Find all vertical or horizontal lines that are more than lthresh
     # long, these are considered lines on the table grid.
 
+        import pdb; pdb.set_trace()
+
         lthresh = int(self.line_length * self.bitmap_resolution)
         vs = zeros(width, dtype=uint8)
-
-        for i in range(width):
+        vd=[]
+        for i in range(l,r+1):
             dd = diff(where(bmp[:, i])[0])
             if len(dd) > 0:
                 v = max(dd)
@@ -480,7 +487,8 @@ class Extractor(object):
                     vd = (where(diff(vs[:]))[0] + 1)
 
         hs = zeros(height, dtype=uint8)
-        for j in range(height):
+        hd=[]
+        for j in range(t,b+1):
             dd = diff(where(bmp[j, :])[0])
             if len(dd) > 0:
                 h = max(dd)
@@ -518,7 +526,7 @@ class Extractor(object):
 
             for j in hd:
                 img[j, :] = [0, 0, 255]  # blue
-                self.imsave(outfile + "-lines.png", img)
+            self.imsave(outfile + "-lines.png", img)
 
             #-----------------------------------------------------------------------
             # divider checking.
@@ -548,7 +556,7 @@ class Extractor(object):
                         if isDiv(0, l, r, t, b):
                             img[t:b, l:r, 0] = 255
                             img[t:b, l:r, 2] = 0
-                            self.imsave(outfile + "-divs.png", img)
+            self.imsave(outfile + "-divs.png", img)
 
             #-----------------------------------------------------------------------
             # Cell finding section.
@@ -630,7 +638,7 @@ class Extractor(object):
             self._text = text
         else:
             self._cells = cells
-            self._text = None
+            text=self._text = None
         curr_page.cells = cells
         curr_page._text = text
 
