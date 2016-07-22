@@ -205,6 +205,19 @@ def col(x, colmult=1.0):
     """colors"""
     return colinterp(colarr, (colmult * x) % 1.0) / 2
 
+class Page(object):
+    """Introduces page data, e.g.,
+    text bounding box, cells, table locations, i.e.,
+    everything recognized.
+    """
+
+    def __init__(self):
+        """
+        """
+        self.layout=[]
+
+
+
 class Extractor(object):
     """Extracts PDF content as whole or
     page by page.
@@ -239,369 +252,352 @@ class Extractor(object):
                  notify=None,
                  imshow=None,
                  ):
+        debug=False
         self.infile=infile
         self.pgs=pgs
-		self.startpage=startpage
-		self.endpage=endpage
-		self.outfilename=outfilename
+        self.startpage=startpage
+        self.endpage=endpage
+        self.outfilename=outfilename
         self.greyscale_threshold=greyscale_threshold
-		self.page=page
-		self.crop=crop
+        self.page=page
+        self.crop=crop
         self.line_length=line_length
         self.bitmap_resolution=bitmap_resolution
-		self.name=name
-		self.pad=pad
-		self.white=white
-		self.black=black
-		self.bitmap=bitmap
+        self.name=name
+        self.pad=pad
+        self.white=white
+        self.black=black
+        self.bitmap=bitmap
         if checkall:
             checkcrop=True
             checklines=True
             checkdivs=True
             checkcells=True
             checkletters=True
-		self.checkcrop=checkcrop
-		self.checklines=checklines
-		self.checkdivs=checkdivs
-		self.checkcells=checkcells
-		self.checkletters=checkletters
-		self.checkall=checkall
-		self.whitespace=whitespace
-		self.boxes=boxes
-		self.encoding=encoding
+        self.checkcrop=checkcrop
+        self.checklines=checklines
+        self.checkdivs=checkdivs
+        self.checkcells=checkcells
+        self.checkletters=checkletters
+        self.checkall=checkall
+        checkany=False
+        if checkcrop or checklines or checkdivs or checkcells or checkletters:
+            debug = True
+            checkany = True
+        self.whitespace=whitespace
+        self.boxes=boxes
+        self.encoding=encoding
         self.rest_text=rest_text
-		self.notify=notify
+        self.notify=notify
         self.imshow=imshow
+
         if imshow != None:
-            self.debug=True
+            debug=True
+
+        if debug:
+            if imshow == None:
+                raise RuntimeError("did not set image saving function")
+            if not checkany:
+                raise RuntimeError("did not set what pictures to be shown")
+
+        self.debug=debug
+        self.checkany=checkany
+
+        self.outfile = outfilename if outfilename else "output"
+        self.pgs = self.frow, self.lrow = (list(map(int, (str(pgs).split(":")))) + [None, None])[0:3]
+
 
     def initialize(self):
         """Initializes internal structures.
         """
-        self.
+        pdfdoc=self.pdfdoc=PopplerProcessor(infile)
+        pdfdoc.resolution = bitmap_resolution
+        pdfdoc.greyscale_threshold = greyscale_threshold
+        self.pages={}
 
     def process(self, notify=None):
         """Process the PDF file sending page number to
         `notify` function.
         """
+        pag=self.start_page
+
+    def process_page(self, pg):
+
+        pdfdoc= self.pdfdoc
+
+        data, page = pdfdoc.get_image(pg - 1)  # Page numbers are 0-based.
+
+        #-----------------------------------------------------------------------
+        # image load section.
+
+        height, width = data.shape[:2]  # If not to reduce to gray, the shape will be (,,3) or (,,4).
+
+        pad = int(self.pad)
+        height += pad * 2
+        width += pad * 2
+
+        # reimbed image with a white pad.
+        bmp = ones((height, width), dtype=bool)
+
+        thr = int(255.0 * greyscale_threshold / 100.0)
+
+        bmp[pad:height - pad, pad:width - pad] = (data[:, :] > thr)
+
+        # Set up Debuging image.
+        img = zeros((height, width, 3), dtype=uint8)
+
+        # img[:, :, :] = bmp * 255 # In case of colored input image
+
+        img[:, :, 0] = bmp * 255
+        img[:, :, 1] = bmp * 255
+        img[:, :, 2] = bmp * 255
+
+        if checkdivs or checkcells or checkletters:
+            imgfloat = img.astype(float)
+
+        if checkletters:  # Show bounding boxes for each text object.
+            img = (imgfloat/2.).astype(uint8)
+            rectangles=pdfdoc.get_rectangles_for_page(pg)
+            lrn=len(rectangles)
+            for k,r in enumerate(rectangles):
+                x1,y1,x2,y2 = [int(bitmap_resolution* float(k)/72.)+pad for k in r]
+                img[y1:y2, x1:x2] += col(random.random()).astype(uint8)
+                imsave(outfile+"-letters.png", img)
 
 
+        #-----------------------------------------------------------------------
+        # Find bounding box.
+        t = 0
 
+        while t < height and all(bmp[t, :]):
+            t = t + 1
+        if t > 0:
+            t = t - 1
 
+        b = height - 1
+        while b > t and all(bmp[b, :]):
+            b = b - 1
+        if b < height - 1:
+            b = b + 1
 
-def process_page(infile,
-                 pgs,
-                 outfilename=None,
-                 greyscale_threshold=25,
-                 page=None,
-                 crop=None,
-                 line_length=0.5,
-                 bitmap_resolution=300,
-                 name=None,
-                 pad=2,
-                 white=None,
-                 black=None,
-                 bitmap=False,
-                 checkcrop=False,
-                 checklines=False,
-                 checkdivs=False,
-                 checkcells=False,
-                 checkall=False,
-                 checkletters=False,
-                 whitespace="normalize",
-                 boxes=False,
-                 encoding="utf8",
-                 rest_text=False,    # Return the rest of text as second parameter
-):
+        l = 0
+        while l < width and all(bmp[:, l]):
+            l = l + 1
+        if l > 0:
+            l = l - 1
 
-    if checkall:
-        checkcrop = True
-        checklines = True
-        checkdivs = True
-        checkcells = True
-        checkletters = True
+        r = width - 1
+        while r > l and all(bmp[:, r]):
+            r = r - 1
+        if r < width - 1:
+            r = r + 1
 
-    outfile = outfilename if outfilename else "output"
-    pdfdoc = PopplerProcessor(infile)
-    page = page or []
-    (pg, frow, lrow) = (list(map(int, (str(pgs).split(":")))) + [None, None])[0:3]
-    pdfdoc.resolution = bitmap_resolution
-    pdfdoc.greyscale_threshold = greyscale_threshold
-
-    data, page = pdfdoc.get_image(pg - 1)  # Page numbers are 0-based.
-
-    #-----------------------------------------------------------------------
-    # image load section.
-
-    height, width = data.shape[:2]  # If not to reduce to gray, the shape will be (,,3) or (,,4).
-
-    pad = int(pad)
-    height += pad * 2
-    width += pad * 2
-
-    # reimbed image with a white pad.
-    bmp = ones((height, width), dtype=bool)
-
-    thr = int(255.0 * greyscale_threshold / 100.0)
-
-    bmp[pad:height - pad, pad:width - pad] = (data[:, :] > thr)
-
-
-    # Set up Debuging image.
-    img = zeros((height, width, 3), dtype=uint8)
-
-    # img[:, :, :] = bmp * 255 # In case of colored input image
-
-    img[:, :, 0] = bmp * 255
-    img[:, :, 1] = bmp * 255
-    img[:, :, 2] = bmp * 255
-
-    if checkdivs or checkcells or checkletters:
-        imgfloat = img.astype(float)
-
-    if checkletters:  # Show bounding boxes for each text object.
-        img = (imgfloat/2.).astype(uint8)
-        rectangles=pdfdoc.get_rectangles_for_page(pg)
-        lrn=len(rectangles)
-        for k,r in enumerate(rectangles):
-            x1,y1,x2,y2 = [int(bitmap_resolution* float(k)/72.)+pad for k in r]
-            img[y1:y2, x1:x2] += col(random.random()).astype(uint8)
-        imsave(outfile+"-letters.png", img)
-
-
-    #-----------------------------------------------------------------------
-    # Find bounding box.
-    t = 0
-
-    while t < height and all(bmp[t, :]):
-        t = t + 1
-    if t > 0:
-        t = t - 1
-
-    b = height - 1
-    while b > t and all(bmp[b, :]):
-        b = b - 1
-    if b < height - 1:
-        b = b + 1
-
-    l = 0
-    while l < width and all(bmp[:, l]):
-        l = l + 1
-    if l > 0:
-        l = l - 1
-
-    r = width - 1
-    while r > l and all(bmp[:, r]):
-        r = r - 1
-    if r < width - 1:
-        r = r + 1
-
-# Mark bounding box.
+    # Mark bounding box.
     # bmp[t, :] = False
     # bmp[b, :] = False
     # bmp[:, l] = False
     # bmp[:, r] = False
 
-    def boxOfString(x, p):
-        s = x.split(":")
-        if len(s) < 4:
-            raise ValueError("boxes have format left:top:right:bottom[:page]")
-        return ([bitmap_resolution * float(x) + pad for x in s[0:4]] +
-                [p if len(s) < 5 else int(s[4])])
+        def boxOfString(x, p):
+            s = x.split(":")
+            if len(s) < 4:
+                raise ValueError("boxes have format left:top:right:bottom[:page]")
+            return ([bitmap_resolution * float(x) + pad for x in s[0:4]] +
+                    [p if len(s) < 5 else int(s[4])])
 
-# translate crop to paint white.
+    # translate crop to paint white.
 
-    whites = []
-    if crop:
-        (l, t, r, b, p) = boxOfString(crop, pg)
-        whites.extend([(0, 0, l, height, p), (0, 0, width, t, p),
-                       (r, 0, width, height, p), (0, b, width, height, p)])
+        whites = []
+        if crop:
+            (l, t, r, b, p) = boxOfString(crop, pg)
+            whites.extend([(0, 0, l, height, p), (0, 0, width, t, p),
+                           (r, 0, width, height, p), (0, b, width, height, p)])
 
-# paint white ...
-    if white:
-        whites.extend([boxOfString(b, pg) for b in white])
+    # paint white ...
+        if white:
+            whites.extend([boxOfString(b, pg) for b in white])
 
-    for (l, t, r, b, p) in whites:
-        if p == pg:
-            bmp[t:b + 1, l:r + 1] = 1
-            img[t:b + 1, l:r + 1] = [255, 255, 255]
+        for (l, t, r, b, p) in whites:
+            if p == pg:
+                bmp[t:b + 1, l:r + 1] = 1
+                img[t:b + 1, l:r + 1] = [255, 255, 255]
 
-# paint black ...
-    if black:
-        for b in black:
-            (l, t, r,
-             b) = [bitmap_resolution * float(x) + pad for x in b.split(":")]
-            bmp[t:b + 1, l:r + 1] = 0
-            img[t:b + 1, l:r + 1] = [0, 0, 0]
+    # paint black ...
+        if black:
+            for b in black:
+                (l, t, r,
+                 b) = [bitmap_resolution * float(x) + pad for x in b.split(":")]
+                bmp[t:b + 1, l:r + 1] = 0
+                img[t:b + 1, l:r + 1] = [0, 0, 0]
 
-    if checkcrop:
-        imsave(outfile+"-crop.png", img)
-
-#-----------------------------------------------------------------------
-# Line finding section.
-#
-# Find all vertical or horizontal lines that are more than lthresh
-# long, these are considered lines on the table grid.
-
-    lthresh = int(line_length * bitmap_resolution)
-    vs = zeros(width, dtype=uint8)
-
-    for i in range(width):
-        dd = diff(where(bmp[:, i])[0])
-        if len(dd) > 0:
-            v = max(dd)
-            if v > lthresh:
-                vs[i] = 1
-        else:
-            # it was a solid black line.
-            if all(bmp[0, i]) == 0:
-                vs[i] = 1
-    vd = (where(diff(vs[:]))[0] + 1)
-
-    hs = zeros(height, dtype=uint8)
-    for j in range(height):
-        dd = diff(where(bmp[j, :])[0])
-        if len(dd) > 0:
-            h = max(dd)
-            if h > lthresh:
-                hs[j] = 1
-        else:
-            # it was a solid black line.
-            if all(bmp[j, 0]) == 0:
-                hs[j] = 1
-    hd = (where(diff(hs[:]))[0] + 1)
+        if checkcrop:
+            imsave(outfile+"-crop.png", img)
 
     #-----------------------------------------------------------------------
-    # Look for dividors that are too large.
-    maxdiv = 10
-    i = 0
+    # Line finding section.
+    #
+    # Find all vertical or horizontal lines that are more than lthresh
+    # long, these are considered lines on the table grid.
 
-    while i < len(vd):
-        if vd[i + 1] - vd[i] > maxdiv:
-            vd = delete(vd, i)
-            vd = delete(vd, i)
-        else:
-            i = i + 2
+        lthresh = int(line_length * bitmap_resolution)
+        vs = zeros(width, dtype=uint8)
 
-    j = 0
-    while j < len(hd):
-        if hd[j + 1] - hd[j] > maxdiv:
-            hd = delete(hd, j)
-            hd = delete(hd, j)
-        else:
-            j = j + 2
+        for i in range(width):
+            dd = diff(where(bmp[:, i])[0])
+            if len(dd) > 0:
+                v = max(dd)
+                if v > lthresh:
+                    vs[i] = 1
+            else:
+                # it was a solid black line.
+                if all(bmp[0, i]) == 0:
+                    vs[i] = 1
+                    vd = (where(diff(vs[:]))[0] + 1)
 
-    if checklines:
-        for i in vd:
-            img[:, i] = [255, 0, 0]  # red
-
-        for j in hd:
-            img[j, :] = [0, 0, 255]  # blue
-        imsave(outfile+"-lines.png", img)
-
-        #-----------------------------------------------------------------------
-        # divider checking.
-        #
-        # at this point vd holds the x coordinate of vertical  and
-        # hd holds the y coordinate of horizontal divider tansitions for each
-        # vertical and horizontal lines in the table grid.
-
-    def isDiv(a, l, r, t, b):
-        # if any col or row (in axis) is all zeros ...
-        return sum(sum(bmp[t:b, l:r], axis=a) == 0) > 0
-
-    if checkdivs:
-        img = (imgfloat / 2).astype(uint8)
-        for j in range(0, len(hd), 2):
-            for i in range(0, len(vd), 2):
-                if i > 0:
-                    (l, r, t, b) = (vd[i - 1], vd[i], hd[j], hd[j + 1])
-                    img[t:b, l:r, 1] = 192
-                    if isDiv(1, l, r, t, b):
-                        img[t:b, l:r, 0] = 0
-                        img[t:b, l:r, 2] = 255
-
-                if j > 0:
-                    (l, r, t, b) = (vd[i], vd[i + 1], hd[j - 1], hd[j])
-                    img[t:b, l:r, 1] = 128
-                    if isDiv(0, l, r, t, b):
-                        img[t:b, l:r, 0] = 255
-                        img[t:b, l:r, 2] = 0
-        imsave(outfile+"-divs.png", img)
+        hs = zeros(height, dtype=uint8)
+        for j in range(height):
+            dd = diff(where(bmp[j, :])[0])
+            if len(dd) > 0:
+                h = max(dd)
+                if h > lthresh:
+                    hs[j] = 1
+            else:
+                # it was a solid black line.
+                if all(bmp[j, 0]) == 0:
+                    hs[j] = 1
+                    hd = (where(diff(hs[:]))[0] + 1)
 
         #-----------------------------------------------------------------------
-        # Cell finding section.
-        # This algorithum is width hungry, and always generates rectangular
-        # boxes.
-
-    cells = []
-    touched = zeros((len(hd), len(vd)), dtype=bool)
-    j = 0
-    while j * 2 + 2 < len(hd):
+        # Look for dividors that are too large.
+        maxdiv = 10
         i = 0
-        while i * 2 + 2 < len(vd):
-            u = 1
-            v = 1
-            if not touched[j, i]:
-                while 2+(i+u)*2 < len(vd) and \
-                    not isDiv( 0, vd[ 2*(i+u) ], vd[ 2*(i+u)+1],
-                       hd[ 2*(j+v)-1 ], hd[ 2*(j+v) ] ):
-                    u = u + 1
-                bot = False
-                while 2 + (j + v) * 2 < len(hd) and not bot:
-                    bot = False
-                    for k in range(1, u + 1):
-                        bot |= isDiv(1, vd[2 * (i + k) - 1], vd[2 * (i + k)],
-                                     hd[2 * (j + v)], hd[2 * (j + v) + 1])
-                    if not bot:
-                        v = v + 1
-                cells.append((i, j, u, v))
-                touched[j:j + v, i:i + u] = True
-            i = i + 1
-        j = j + 1
 
-    if checkcells:
-        nc = len(cells) + 0.
-        img = (imgfloat / 2.).astype(uint8)
-        for k in range(len(cells)):
-            (i, j, u, v) = cells[k]
+        while i < len(vd):
+            if vd[i + 1] - vd[i] > maxdiv:
+                vd = delete(vd, i)
+                vd = delete(vd, i)
+            else:
+                i = i + 2
+
+        j = 0
+        while j < len(hd):
+            if hd[j + 1] - hd[j] > maxdiv:
+                hd = delete(hd, j)
+                hd = delete(hd, j)
+            else:
+                j = j + 2
+
+        if checklines:
+            for i in vd:
+                img[:, i] = [255, 0, 0]  # red
+
+            for j in hd:
+                img[j, :] = [0, 0, 255]  # blue
+                imsave(outfile+"-lines.png", img)
+
+            #-----------------------------------------------------------------------
+            # divider checking.
+            #
+            # at this point vd holds the x coordinate of vertical  and
+            # hd holds the y coordinate of horizontal divider tansitions for each
+            # vertical and horizontal lines in the table grid.
+
+        def isDiv(a, l, r, t, b):
+            # if any col or row (in axis) is all zeros ...
+            return sum(sum(bmp[t:b, l:r], axis=a) == 0) > 0
+
+        if checkdivs:
+            img = (imgfloat / 2).astype(uint8)
+            for j in range(0, len(hd), 2):
+                for i in range(0, len(vd), 2):
+                    if i > 0:
+                        (l, r, t, b) = (vd[i - 1], vd[i], hd[j], hd[j + 1])
+                        img[t:b, l:r, 1] = 192
+                        if isDiv(1, l, r, t, b):
+                            img[t:b, l:r, 0] = 0
+                            img[t:b, l:r, 2] = 255
+
+                    if j > 0:
+                        (l, r, t, b) = (vd[i], vd[i + 1], hd[j - 1], hd[j])
+                        img[t:b, l:r, 1] = 128
+                        if isDiv(0, l, r, t, b):
+                            img[t:b, l:r, 0] = 255
+                            img[t:b, l:r, 2] = 0
+                            imsave(outfile+"-divs.png", img)
+
+            #-----------------------------------------------------------------------
+            # Cell finding section.
+            # This algorithum is width hungry, and always generates rectangular
+            # boxes.
+
+        cells = []
+        touched = zeros((len(hd), len(vd)), dtype=bool)
+        j = 0
+        while j * 2 + 2 < len(hd):
+            i = 0
+            while i * 2 + 2 < len(vd):
+                u = 1
+                v = 1
+                if not touched[j, i]:
+                    while 2+(i+u)*2 < len(vd) and \
+                          not isDiv( 0, vd[ 2*(i+u) ], vd[ 2*(i+u)+1],
+                                     hd[ 2*(j+v)-1 ], hd[ 2*(j+v) ] ):
+                        u = u + 1
+                        bot = False
+                    while 2 + (j + v) * 2 < len(hd) and not bot:
+                        bot = False
+                        for k in range(1, u + 1):
+                            bot |= isDiv(1, vd[2 * (i + k) - 1], vd[2 * (i + k)],
+                                         hd[2 * (j + v)], hd[2 * (j + v) + 1])
+                        if not bot:
+                            v = v + 1
+                            cells.append((i, j, u, v))
+                            touched[j:j + v, i:i + u] = True
+                            i = i + 1
+                            j = j + 1
+
+        if checkcells:
+            nc = len(cells) + 0.
+            img = (imgfloat / 2.).astype(uint8)
+            for k in range(len(cells)):
+                (i, j, u, v) = cells[k]
+                (l, r, t, b) = (vd[2 * i + 1], vd[2 * (i + u)], hd[2 * j + 1],
+                                hd[2 * (j + v)])
+                img[t:b, l:r] += col(k*0.9 / nc + 0.1*random.random()).astype(uint8)
+
+            imsave(outfile+"-cells.png", img)
+
+            #-----------------------------------------------------------------------
+            # fork out to extract text for each cell.
+
+        def getCell(_coordinate, img=None):
+            (i, j, u, v) = _coordinate
             (l, r, t, b) = (vd[2 * i + 1], vd[2 * (i + u)], hd[2 * j + 1],
                             hd[2 * (j + v)])
-            img[t:b, l:r] += col(k*0.9 / nc + 0.1*random.random()).astype(uint8)
+            ret, rect = pdfdoc.get_text(page, l - pad, t - pad, r - l, b - t)
 
-        imsave(outfile+"-cells.png", img)
+            if type(img)!=type(None) and checkletters:
+                (x1,y1,x2,y2) = [int(bitmap_resolution * float(rrr)/72+pad) for rrr in [rect.x1,rect.y1,rect.x2,rect.y2]]
+                img[y1:y2,x1:x2] += col(random.random()).astype(uint8)
 
-        #-----------------------------------------------------------------------
-        # fork out to extract text for each cell.
+            return (i, j, u, v, pg, ret)
 
-    def getCell(_coordinate, img=None):
-        (i, j, u, v) = _coordinate
-        (l, r, t, b) = (vd[2 * i + 1], vd[2 * (i + u)], hd[2 * j + 1],
-                        hd[2 * (j + v)])
-        ret, rect = pdfdoc.get_text(page, l - pad, t - pad, r - l, b - t)
+        if checkletters:
+            img = (imgfloat / 2.).astype(uint8)
 
-        if type(img)!=type(None) and checkletters:
-            (x1,y1,x2,y2) = [int(bitmap_resolution * float(rrr)/72+pad) for rrr in [rect.x1,rect.y1,rect.x2,rect.y2]]
-            img[y1:y2,x1:x2] += col(random.random()).astype(uint8)
-
-        return (i, j, u, v, pg, ret)
-
-    if checkletters:
-        img = (imgfloat / 2.).astype(uint8)
-
-    if boxes:
-        cells = [x + (pg,
-                      "", ) for x in cells
-                 if (frow == None or (x[1] >= frow and x[1] <= lrow))]
-    else:
-        cells = [getCell(x, img) for x in cells
-                 if (frow == None or (x[1] >= frow and x[1] <= lrow))]
-    if checkletters:
-        imsave(outfile+"-text-locations.png", img)
-    if rest_text:
-        text = pdfdoc.get_rest_text()
-        return cells, text
-    return cells
+        if boxes:
+            cells = [x + (pg,
+                          "", ) for x in cells
+                     if (frow == None or (x[1] >= frow and x[1] <= lrow))]
+        else:
+            cells = [getCell(x, img) for x in cells
+                     if (frow == None or (x[1] >= frow and x[1] <= lrow))]
+        if checkletters:
+            imsave(outfile+"-text-locations.png", img)
+        if rest_text:
+            text = pdfdoc.get_rest_text()
+            return cells, text
+        return cells
 
 #-----------------------------------------------------------------------
 #output section.
@@ -813,3 +809,19 @@ def o_table_html(cells,
             tr.appendChild(td)
         table.appendChild(tr)
     outfile.write(doc.toprettyxml())
+
+
+def process_page(infile,
+                 pgs,
+                 **kwargs):
+    """Performs extraction. It is API function of the
+    previous version of the library.
+    """
+    ext=Extractor(
+        infile=infile,
+        pgs=pgs,
+        **kwargs)
+
+    ext.process()
+
+    return ext.cells()
