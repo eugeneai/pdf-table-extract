@@ -21,7 +21,7 @@ else:
 start_page=12
 end_page=12
 infile="059285.pdf"
-outfilename="out/059285.html"
+outfilename="out/{}-059285.html"
 checkall = DEBUG
 
 def notify_page(page):
@@ -43,6 +43,7 @@ proc.process()
 
 cells=proc.cells()
 
+proc.output(table_html_filename=outfilename)
 
 def proc(p, check=False):
     p+=1
@@ -65,7 +66,9 @@ def proc(p, check=False):
 #flatten the cells structure
 #cells = [item for sublist in cells for item in sublist]
 
-pprint.pprint (cells)
+#pprint.pprint (cells)
+
+
 
 quit()
 #without any options, process_page picks up a blank table at the top of the page.

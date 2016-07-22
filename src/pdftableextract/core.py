@@ -642,7 +642,7 @@ class Extractor(object):
             self._cells = cells
             text = self._text = None
         curr_page.cells = cells
-        curr_page._text = text
+        curr_page.text = text
 
     def cells(self, pg=None):
         """Return all the cells found.
@@ -665,22 +665,35 @@ class Extractor(object):
         return "".join(texts)
 
     def output(self,
-           pgs=None,
-           cells_csv_filename=None,
-           cells_json_filename=None,
-           cells_xml_filename=None,
-           table_csv_filename=None,
-           table_html_filename=None,
-           table_list_filename=None,
-           infile=None,
-           name=None,
-           output_type=None):
+               pgs=None,
+               cells_csv_filename=None,
+               cells_json_filename=None,
+               cells_xml_filename=None,
+               table_csv_filename=None,
+               table_html_filename=None,
+               table_list_filename=None,
+               name=None,
+               output_type=None):
         """Output recognition result in various
         formats defined by parameters.
         """
         for pg, page in self.pages.items():
             cells=self.cells(pg)
             text=self.texts(pg)
+            pref="page-{:04d}".format(pg)
+            output(cells,
+                   text=text,
+                   pgs=None,
+                   prefix=pref,
+                   cells_csv_filename=cells_csv_filename,
+                   cells_json_filename=cells_json_filename,
+                   cells_xml_filename=cells_xml_filename,
+                   table_csv_filename=table_csv_filename,
+                   table_html_filename=table_html_filename,
+                   table_list_filename=table_list_filename,
+                   infile=self.infile,
+                   name=name,
+                   output_type=output_type)
 
 
 #-----------------------------------------------------------------------
@@ -698,7 +711,9 @@ def output(cells,
            infile=None,
            name=None,
            output_type=None,
-           text=None):
+           text=None,
+           prefix=None):
+
 
     output_types = [
         dict(filename=cells_csv_filename,
@@ -715,7 +730,10 @@ def output(cells,
     for entry in output_types:
         if entry["filename"]:
             if entry["filename"] != sys.stdout:
-                outfile = open(entry["filename"], 'w')
+                filename=entry["filename"]
+                if "{}" in filename:
+                    filename=filename.format(prefix)
+                outfile = open(filename, 'wb')
             else:
                 outfile = sys.stdout
 
@@ -843,54 +861,50 @@ def o_table_html(cells,
     oj = 0
     opg = 0
     # doc = getDOMImplementation().createDocument(None, "table", None)
-    doc = getDOMImplementation().createDocument(None, "div", None)
-    div = root = doc.documentElement
-    p = doc.createElement("p")
+    doc = etree.Element("div")
+    div = root = doc
     if text != None and text.strip():
-        p.setAttribute("align", "justify")
+        p = etree.SubElement(div, "p")
+        p.set("align", "justify")
         text = text.rstrip()
         pars = text.split("\n")
         for par in pars:
-            _div = doc.createElement("div")
-            _div.setAttribute("class", "sentence")
-            _text = doc.createTextNode(par)
-            _div.appendChild(_text)
-            p.appendChild(_div)
-        div.appendChild(p)
+            _div = etree.SubElement(p, "div")
+            _div.set("class", "sentence")
+            _div.text=par
+
     nc = len(cells)
     if nc > 0:
-        table = doc.createElement("table")
-        div.appendChild(table)
+        table = etree.SubElement(div, "table")
         if (output_type == "table_chtml"):
-            table.setAttribute("border", "1")
-            table.setAttribute("cellspacing", "0")
-            table.setAttribute("style", "border-spacing:0")
+            table.set("border", "1")
+            table.set("cellspacing", "0")
+            table.set("style", "border-spacing:0")
         tr = None
         for k in range(nc):
             (i, j, u, v, pg, value) = cells[k]
             if j > oj or pg > opg:
                 if pg > opg:
                     s = "Name: " + name + ", " if name else ""
-                    table.appendChild(doc.createComment(s + (
+                    table.append(etree.Comment(s + (
                         "Source: %s page %d." % (infile, pg))))
-                if tr:
-                    table.appendChild(tr)
-                tr = doc.createElement("tr")
+                #if tr:
+                #    table.appendChild(tr)
+                #tr = doc.createElement("tr")
+                tr = etree.SubElement(table, "tr")
                 oj = j
                 opg = pg
-            td = doc.createElement("td")
+            td = etree.SubElement(tr, "td")
             if value != "":
-                td.appendChild(doc.createTextNode(value))
+                td.text=value
             if u > 1:
-                td.setAttribute("colspan", str(u))
+                td.set("colspan", str(u))
             if v > 1:
-                td.setAttribute("rowspan", str(v))
+                td.set("rowspan", str(v))
             if output_type == "table_chtml":
-                td.setAttribute("style", "background-color: #%02x%02x%02x" %
+                td.set("style", "background-color: #%02x%02x%02x" %
                                 tuple(128 + col(k / (nc + 0.))))
-            tr.appendChild(td)
-        table.appendChild(tr)
-    outfile.write(doc.toprettyxml())
+    outfile.write(etree.tostring(doc,method="html",pretty_print=True,encoding="UTF-8"))
 
 
 def process_page(infile, pgs, **kwargs):
