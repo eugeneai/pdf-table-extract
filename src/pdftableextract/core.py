@@ -60,6 +60,9 @@ class PopplerProcessor(object):
         l = page.get_text_layout()
         if l[0]:
             self.layout = l[1]
+        else:
+            self.layout=None
+
         return page
 
     def get_image(self, index):
@@ -249,7 +252,7 @@ class Extractor(object):
                  whitespace="normalize",
                  boxes=False,
                  encoding="utf8",
-                 rest_text=False,    # Return the rest of text as second parameter):
+                 rest_text=True,    # Return the rest of text as second parameter):
                  notify=None,
                  imsave=None,
                  ):
@@ -784,7 +787,8 @@ def o_cells_xml(cells,
                 outfile=None,
                 infile=None,
                 name=None,
-                output_type=None):
+                output_type=None,
+                text=None):
     """Output XML formatted cell data"""
     outfile = outfile or sys.stdout
     #defaults
@@ -792,21 +796,31 @@ def o_cells_xml(cells,
     name = name or ""
 
     def _lambda(a):
-        return x.setAttribute(*a)
+        return x.set(*a)
 
-    doc = getDOMImplementation().createDocument(None, "table", None)
-    root = doc.documentElement
+    table = etree.Element("table")
+    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    text = None # FIXME We will ignore text in cell_xml mode
+    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    if text != None:
+        root= etree.Element("document")
+        t=etree.SubElement(root, "text")
+        t.text=text
+        root.append(table)
+        doc = etree.ElementTree(root)
+    else:
+        doc = etree.ElementTree(table)
+        root = table
     if infile:
-        root.setAttribute("src", infile)
+        table.set("src", infile)
     if name:
-        root.setAttribute("name", name)
+        table.set("name", name)
     for cl in cells:
-        x = doc.createElement("cell")
+        x = etree.SubElement(table, "cell")
         map(_lambda, zip("xywhp", map(str, cl)))
         if cl[5] != "":
-            x.appendChild(doc.createTextNode(cl[5]))
-        root.appendChild(x)
-    outfile.write(doc.toprettyxml())
+            x.text=cl[5]
+    doc.write(outfile, pretty_print=True, encoding="UTF-8")
 
 
 def table_to_list(cells, pgs):
@@ -860,7 +874,6 @@ def o_table_html(cells,
 
     oj = 0
     opg = 0
-    # doc = getDOMImplementation().createDocument(None, "table", None)
     doc = etree.Element("div")
     div = root = doc
     if text != None and text.strip():

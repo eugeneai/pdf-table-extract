@@ -19,7 +19,7 @@ else:
 
 
 start_page=1
-end_page=240
+end_page=15
 infile="059285.pdf"
 outfilename="out/{}-059285.html"
 checkall = DEBUG
