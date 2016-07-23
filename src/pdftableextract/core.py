@@ -168,13 +168,13 @@ class PopplerProcessor(object):
 
         return txt, r
 
-    def get_rest_text(self):
+    def get_rest_text(self, bbox=None):
         """Returns the rest of a text, that is not
         recognized as data of a table.
         """
         chars = []
         for i, char in enumerate(self.text):
-            if not i in self.table_chars:
+            if not i in self.table_chars: # FIXME add inside bbox removal.
                 chars.append(char)
         return "".join(chars)
 
@@ -355,6 +355,7 @@ class Extractor(object):
         bmp[pad:height - pad, pad:width - pad] = (data[:, :] > thr)
 
         checkany = self.checkany
+        scale_to_pdf = self.bitmap_resolution / 72.
 
         if checkany:
             import random
@@ -377,7 +378,7 @@ class Extractor(object):
                 lrn = len(rectangles)
                 for k, r in enumerate(rectangles):
                     x1, y1, x2, y2 = [
-                        int(self.bitmap_resolution * float(k) / 72.) + pad
+                        int(scale_to_pdf * float(k)) + pad
                         for k in r
                     ]
                     img[y1:y2, x1:x2] += col(random.random()).astype(uint8)
@@ -410,9 +411,13 @@ class Extractor(object):
         if r < width - 1:
             r = r + 1
 
-        [curr_page.set(_k, str(_v - pad))
-         for _k, _v in zip("ltrb", [l, t, r, b])]
-        curr_page.set("bounding-box", " ".join(map(str, [l, t, r, b])))
+        scaled=[(_v-pad)*scale_to_pdf for _v in [l, t, r, b]]
+        [curr_page.set("bbox-"+_k, str(_v)) for _k, _v in zip(["left","top", "right","bottom"], scaled)]
+        (sl,st,sr,sb) = scaled
+        curr_page.set("bbox-width", str(abs(sr-sl)))
+        curr_page.set("bbox-height", str(abs(st-sb)))
+        curr_page.set("bounding-box", " ".join(map(str, [sl, st, sr, sb])))
+        [curr_page.set(_k,str(_v)) for _k,_v in zip(["width","height"],page.get_size())]
 
         # Mark bounding box.
         # bmp[t, :] = False
@@ -610,7 +615,7 @@ class Extractor(object):
 
             if self.checkletters:
                 (x1, y1, x2, y2) = [
-                    int(self.bitmap_resolution * float(rrr) / 72 + pad)
+                    int(scale_to_pdf * float(rrr) + pad)
                     for rrr in [rect.x1, rect.y1, rect.x2, rect.y2]
                 ]
                 img[y1:y2, x1:x2] += col(random.random()).astype(uint8)
@@ -631,23 +636,38 @@ class Extractor(object):
 
         if self.checkletters:
             self.imsave(outfile + "-text-locations.png", img)
-        if self.rest_text:
-            text = pdfdoc.get_rest_text()
-            self._cells = cells
-            self._text = text
-        else:
-            self._cells = cells
-            text = self._text = None
+        self._cells = cells
+        text = self._text = None
 
         def cell_proc(tbl, cl):
             c = etree.SubElement(tbl, "cell")
             [c.set(k, str(v)) for k, v in zip("xywhp", map(str, cl))]
             if cl[-1]:
                 c.text = cl[-1]
-            return c
+            (i, j, u, v) = cl[:4]
+            (cl, cr, ct, cb) = (vd[2 * i + 1], vd[2 * (i + u)], hd[2 * j + 1],
+                            hd[2 * (j + v)])
+            (cl, cr, ct, cb) = [(_v-pad)*scale_to_pdf for _v in (cl,cr,ct,cb)]
+            (cw, ch) = cr-cl, abs(ct-cb)
+            [c.set("bbox-"+k, str(v)) for k, v in zip(["left","right", "top", "bottom","width", "height"], map(str, (cl,cr,ct,cb, cw,ch)))]
+            return cl, cr, ct, cb, i, j, u, v
 
         table = etree.SubElement(curr_page, "table")
-        [cell_proc(table, cl) for cl in cells]
+        mat=numpy.array([cell_proc(table, cl) for cl in cells])
+        cl, cr, ct, cb = min(mat[:, 0]), max(mat[:,1]), min(mat[:,2]), max(mat[:,3])
+        _w, _h = max(mat[:,4]+mat[:,6])-1, max(mat[:,5]+mat[:,7])-1
+        cw=cr-cl
+        ch=cb-ct
+        [table.set("bbox-"+_k, str(_v)) for _k,_v in zip(
+            ["left","right","top","bottom","width","height"],
+                                                 [cl,cr,ct,cb,cw,ch]) ]
+        table.set("width", str(int(_w)))
+        table.set("height", str(int(_h)))
+        table.set("page", str(pg))
+        if self.rest_text:
+            text = pdfdoc.get_rest_text(bbox=(cl,cr,ct,cb))
+            self._text = text
+
         if text != None:
             etext = etree.SubElement(curr_page, "text")
             etext.text = text

@@ -18,12 +18,12 @@ else:
     debug_imsave=None
 
 
-start_page=1
-end_page=20
+start_page=11
+end_page=13
 infile="059285.pdf"
 outfilename="out/{}-059285.html"
 checkall = DEBUG
-out_xml=outfilename.replace("html","xml").format("xml")
+out_xml=outfilename.replace("html","xml").format("xml-{}-{}".format(start_page, end_page))
 
 
 def notify_page(page):
