@@ -61,7 +61,7 @@ class PopplerProcessor(object):
         if l[0]:
             self.layout = l[1]
         else:
-            self.layout=None
+            self.layout = None
 
         return page
 
@@ -210,18 +210,6 @@ def col(x, colmult=1.0):
     return colinterp(colarr, (colmult * x) % 1.0) / 2
 
 
-class Page(object):
-    """Introduces page data, e.g.,
-    text bounding box, cells, table locations, i.e.,
-    everything recognized.
-    """
-
-    def __init__(self):
-        """
-        """
-        self.layout = []
-
-
 class Extractor(object):
     """Extracts PDF content as whole or
     page by page.
@@ -315,7 +303,8 @@ class Extractor(object):
             self.pgs = range(pgs, pgs + 1)
         else:
             self.pgs = range(startpage, endpage + 1)
-            self.frow=self.lrow=None
+            self.frow = self.lrow = None
+        self.edoc = self.etree = None
 
     def initialize(self):
         """Initializes internal structures.
@@ -324,6 +313,8 @@ class Extractor(object):
         pdfdoc.resolution = self.bitmap_resolution
         pdfdoc.greyscale_threshold = self.greyscale_threshold
         self.pages = collections.OrderedDict()
+        self.edoc = etree.Element("document")
+        self.etree = etree.ElementTree(self.edoc)
 
     def process(self, notify=None):
         """Process the PDF file sending page number to
@@ -343,7 +334,8 @@ class Extractor(object):
 
         data, page = pdfdoc.get_image(pg - 1)  # Page numbers are 0-based.
 
-        curr_page = self.pages[pg] = Page()
+        curr_page = self.pages[pg] = etree.SubElement(
+            self.edoc, "page", number=str(pg))
 
         #-----------------------------------------------------------------------
         # image load section.
@@ -418,7 +410,9 @@ class Extractor(object):
         if r < width - 1:
             r = r + 1
 
-        curr_page.bounding_box = [int(_i - pad) for _i in [l, t, r, b]]
+        [curr_page.set(_k, str(_v - pad))
+         for _k, _v in zip("ltrb", [l, t, r, b])]
+        curr_page.set("bounding-box", " ".join(map(str, [l, t, r, b])))
 
         # Mark bounding box.
         # bmp[t, :] = False
@@ -440,7 +434,7 @@ class Extractor(object):
     # translate crop to paint white.
 
         whites = []
-        curr_page.whites = whites
+        # curr_page.whites = whites
         if self.crop:
             (l, t, r, b, p) = boxOfString(self.crop, pg)
             whites.extend([(0, 0, l, height, p), (0, 0, width, t, p),
@@ -583,9 +577,9 @@ class Extractor(object):
                     while 2 + (j + v) * 2 < len(hd) and not bot:
                         bot = False
                         for k in range(1, u + 1):
-                            bot |= isDiv(1, vd[2 * (i + k) - 1],
-                                         vd[2 * (i + k)], hd[2 * (j + v)],
-                                         hd[2 * (j + v) + 1])
+                            bot |= isDiv(1, vd[2 * (i + k) - 1], vd[2 *
+                                                                    (i + k)],
+                                         hd[2 * (j + v)], hd[2 * (j + v) + 1])
                         if not bot:
                             v = v + 1
                     cells.append((i, j, u, v))
@@ -644,28 +638,61 @@ class Extractor(object):
         else:
             self._cells = cells
             text = self._text = None
-        curr_page.cells = cells
-        curr_page.text = text
+
+        def cell_proc(tbl, cl):
+            c = etree.SubElement(tbl, "cell")
+            [c.set(k, str(v)) for k, v in zip("xywhp", map(str, cl))]
+            if cl[-1]:
+                c.text = cl[-1]
+            return c
+
+        table = etree.SubElement(curr_page, "table")
+        [cell_proc(table, cl) for cl in cells]
+        if text != None:
+            etext = etree.SubElement(curr_page, "text")
+            etext.text = text
+
+    def xml_write(self, f):
+        self.etree.write(f, pretty_print=True, encoding="UTF-8")
+
+    def _get_cells(self, pg):
+        tbls = self.pages[pg].iterfind("table")
+        cells = []
+        for tbl in tbls:
+            cls = []
+            for cl in tbl.iterfind("cell"):
+                l = [int(cl.get(v)) for v in "xywhp"]
+                if cl.text:
+                    l.append(cl.text)
+                else:
+                    l.append('')
+                cls.append(l)
+            cells.append(cls)
+        if len(cells) == 1:
+            cells = cells[0]
+        return cells
 
     def cells(self, pg=None):
         """Return all the cells found.
         """
-        if pg!=None:
-            return self.pages[pg].cells
+        if pg != None:
+            return self._get_cells(pg)
         cells = []
-        for p in self.pages.values():
-            cells.extend(p.cells)
+        for p in self.pages.keys():
+            cells.extend(self._get_cells(p))
         return cells
 
     def texts(self, pg=None):
         """Return all the cells found.
         """
-        if pg!=None:
-            return self.pages[pg].text
-        texts= []
-        for p in self.pages.values():
-            texts.extend(p.text)
-        return "".join(texts)
+        if pg != None:
+            node = self.pages[pg]
+            etexts = node.iterfind("text")
+        else:
+            node = self.edoc
+            etexts = node.iterfind(".//text")
+        text = "".join([_e.text for _e in etexts])
+        return text
 
     def output(self,
                pgs=None,
@@ -681,23 +708,23 @@ class Extractor(object):
         formats defined by parameters.
         """
         for pg, page in self.pages.items():
-            cells=self.cells(pg)
-            text=self.texts(pg)
-            pref="page-{:04d}".format(pg)
-            output(cells,
-                   text=text,
-                   pgs=None,
-                   prefix=pref,
-                   cells_csv_filename=cells_csv_filename,
-                   cells_json_filename=cells_json_filename,
-                   cells_xml_filename=cells_xml_filename,
-                   table_csv_filename=table_csv_filename,
-                   table_html_filename=table_html_filename,
-                   table_list_filename=table_list_filename,
-                   infile=self.infile,
-                   name=name,
-                   output_type=output_type)
-
+            cells = self.cells(pg)
+            text = self.texts(pg)
+            pref = "page-{:04d}".format(pg)
+            output(
+                cells,
+                text=text,
+                pgs=None,
+                prefix=pref,
+                cells_csv_filename=cells_csv_filename,
+                cells_json_filename=cells_json_filename,
+                cells_xml_filename=cells_xml_filename,
+                table_csv_filename=table_csv_filename,
+                table_html_filename=table_html_filename,
+                table_list_filename=table_list_filename,
+                infile=self.infile,
+                name=name,
+                output_type=output_type)
 
 #-----------------------------------------------------------------------
 #output section.
@@ -717,25 +744,23 @@ def output(cells,
            text=None,
            prefix=None):
 
-
     output_types = [
-        dict(filename=cells_csv_filename,
-             function=o_cells_csv), dict(filename=cells_json_filename,
-                                         function=o_cells_json),
-        dict(filename=cells_xml_filename,
-             function=o_cells_xml), dict(filename=table_csv_filename,
-                                         function=o_table_csv),
-        dict(filename=table_html_filename,
-             function=o_table_html), dict(filename=table_list_filename,
-                                          function=o_table_list)
+        dict(
+            filename=cells_csv_filename, function=o_cells_csv), dict(
+                filename=cells_json_filename, function=o_cells_json), dict(
+                    filename=cells_xml_filename, function=o_cells_xml), dict(
+                        filename=table_csv_filename, function=o_table_csv),
+        dict(
+            filename=table_html_filename, function=o_table_html), dict(
+                filename=table_list_filename, function=o_table_list)
     ]
 
     for entry in output_types:
         if entry["filename"]:
             if entry["filename"] != sys.stdout:
-                filename=entry["filename"]
+                filename = entry["filename"]
                 if "{}" in filename:
-                    filename=filename.format(prefix)
+                    filename = filename.format(prefix)
                 outfile = open(filename, 'wb')
             else:
                 outfile = sys.stdout
@@ -800,12 +825,12 @@ def o_cells_xml(cells,
 
     table = etree.Element("table")
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    text = None # FIXME We will ignore text in cell_xml mode
+    text = None  # FIXME We will ignore text in cell_xml mode
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     if text != None:
-        root= etree.Element("document")
-        t=etree.SubElement(root, "text")
-        t.text=text
+        root = etree.Element("document")
+        t = etree.SubElement(root, "text")
+        t.text = text
         root.append(table)
         doc = etree.ElementTree(root)
     else:
@@ -819,7 +844,7 @@ def o_cells_xml(cells,
         x = etree.SubElement(table, "cell")
         map(_lambda, zip("xywhp", map(str, cl)))
         if cl[5] != "":
-            x.text=cl[5]
+            x.text = cl[5]
     doc.write(outfile, pretty_print=True, encoding="UTF-8")
 
 
@@ -884,7 +909,7 @@ def o_table_html(cells,
         for par in pars:
             _div = etree.SubElement(p, "div")
             _div.set("class", "sentence")
-            _div.text=par
+            _div.text = par
 
     nc = len(cells)
     if nc > 0:
@@ -899,8 +924,9 @@ def o_table_html(cells,
             if j > oj or pg > opg:
                 if pg > opg:
                     s = "Name: " + name + ", " if name else ""
-                    table.append(etree.Comment(s + (
-                        "Source: %s page %d." % (infile, pg))))
+                    table.append(
+                        etree.Comment(s + ("Source: %s page %d." % (infile, pg)
+                                           )))
                 #if tr:
                 #    table.appendChild(tr)
                 #tr = doc.createElement("tr")
@@ -909,15 +935,17 @@ def o_table_html(cells,
                 opg = pg
             td = etree.SubElement(tr, "td")
             if value != "":
-                td.text=value
+                td.text = value
             if u > 1:
                 td.set("colspan", str(u))
             if v > 1:
                 td.set("rowspan", str(v))
             if output_type == "table_chtml":
                 td.set("style", "background-color: #%02x%02x%02x" %
-                                tuple(128 + col(k / (nc + 0.))))
-    outfile.write(etree.tostring(doc,method="html",pretty_print=True,encoding="UTF-8"))
+                       tuple(128 + col(k / (nc + 0.))))
+    outfile.write(
+        etree.tostring(
+            doc, method="html", pretty_print=True, encoding="UTF-8"))
 
 
 def process_page(infile, pgs, **kwargs):

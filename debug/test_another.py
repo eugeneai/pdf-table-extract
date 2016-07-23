@@ -19,10 +19,12 @@ else:
 
 
 start_page=1
-end_page=15
+end_page=20
 infile="059285.pdf"
 outfilename="out/{}-059285.html"
 checkall = DEBUG
+out_xml=outfilename.replace("html","xml").format("xml")
+
 
 def notify_page(page):
     print ("Processing page {:04d}.".format(page))
@@ -44,6 +46,8 @@ proc.process()
 cells=proc.cells()
 
 proc.output(table_html_filename=outfilename)
+
+proc.xml_write(open(out_xml,'wb'))
 
 def proc(p, check=False):
     p+=1
