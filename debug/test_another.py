@@ -11,57 +11,62 @@ if DEBUG:
     from matplotlib.image import imsave
 
     def debug_imsave(name, image):
-        namw="out/"+name
-        print ("DEBUG: Saving {}".format(name))
-        imsave(name,image)
+        namw = "out/" + name
+        print("DEBUG: Saving {}".format(name))
+        imsave(name, image)
 else:
-    debug_imsave=None
+    debug_imsave = None
 
-
-start_page=11
-end_page=13
-infile="059285.pdf"
-outfilename="out/{}-059285.html"
+start_page = 1
+end_page = 240
+infile = "059285.pdf"
+outfilename = "out/{}-059285.html"
 checkall = DEBUG
-out_xml=outfilename.replace("html","xml").format("xml-{}-{}".format(start_page, end_page))
+out_xml = outfilename.replace(
+    "html", "xml").format("xml-{}-{}".format(start_page, end_page))
 
 
 def notify_page(page):
-    print ("Processing page {:04d}.".format(page))
+    print("Processing page {:04d}.".format(page))
 
-proc = pdf.Extractor(
-    infile=infile,
-    checkall=checkall,
-    startpage=start_page,
-    endpage=end_page,
-    outfilename=outfilename,
-    bitmap_resolution=72,
-    greyscale_threshold=50,
-    notify=notify_page,
-    imsave=debug_imsave,
-)
+
+proc = pdf.Extractor(infile=infile,
+                     checkall=checkall,
+                     startpage=start_page,
+                     endpage=end_page,
+                     outfilename=outfilename,
+                     bitmap_resolution=72,
+                     greyscale_threshold=50,
+                     notify=notify_page,
+                     imsave=debug_imsave, )
 
 proc.process()
 
-cells=proc.cells()
+cells = proc.cells()
 
 proc.output(table_html_filename=outfilename)
 
-proc.xml_write(open(out_xml,'wb'))
+proc.xml_write(open(out_xml, 'wb'))
+
 
 def proc(p, check=False):
-    p+=1
-    outfilename="out/page-{:04d}.html".format(p)
-    print ("Processing page {:04d}.".format(p))
-    cells, text= pdf.process_page(infile,
-                            p,
-                            bitmap_resolution=72,
-                            outfilename=outfilename,
-                            greyscale_threshold=50,
-                            checkall=check,
-                            rest_text=True
-    )
-    pdf.output(cells, p, output_type="table_html", table_html_filename=outfilename, infile=infile, name=infile, text=text)
+    p += 1
+    outfilename = "out/page-{:04d}.html".format(p)
+    print("Processing page {:04d}.".format(p))
+    cells, text = pdf.process_page(infile,
+                                   p,
+                                   bitmap_resolution=72,
+                                   outfilename=outfilename,
+                                   greyscale_threshold=50,
+                                   checkall=check,
+                                   rest_text=True)
+    pdf.output(cells,
+               p,
+               output_type="table_html",
+               table_html_filename=outfilename,
+               infile=infile,
+               name=infile,
+               text=text)
     return cells
 
 #cells = [pdf.process_page("./background-checks.pdf",
@@ -71,8 +76,6 @@ def proc(p, check=False):
 #cells = [item for sublist in cells for item in sublist]
 
 #pprint.pprint (cells)
-
-
 
 quit()
 #without any options, process_page picks up a blank table at the top of the page.

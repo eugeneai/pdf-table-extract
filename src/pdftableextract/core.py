@@ -51,8 +51,6 @@ class PopplerProcessor(object):
             raise IndexError("page number is out of bounds")
         page = self.document.get_page(index)
         if self.layout != None:
-            #Glib.free(self.layout)
-            # Do we need freeing elements of the list # FIXME
             self.layout = None
         self.text = page.get_text()
         self.attributes = page.get_text_attributes()
@@ -116,8 +114,18 @@ class PopplerProcessor(object):
         print(msg, x, height - y, w, h, "---", x1, height - y1, x2,
               height - y2)
 
+    def inside(self, a, b, pad=0):
+        """Check if Rectangle a is mostly inside Rectangle b.
+
+        Arguments:
+        - `a`, `b` : The rectangles;
+        - `pad` : Additional space. (IGNORED)
+        """
+        ay = (a.y1 + a.y2) / 2.
+        return a.x1 < b.x2 and a.x2 > b.x1 and ay < b.y2 and ay > b.y1
+
     def overlap(self, a, b, pad=0):
-        """Check if Rectangle b and Rectangle overlaps.
+        """Check if Rectangle a and Rectangle b overlaps.
 
         Arguments:
         - `a`, `b` : The rectangles;
@@ -158,7 +166,7 @@ class PopplerProcessor(object):
         r.x2 = r.y2 = -1e10
         chars = []
         for k, l in enumerate(self.layout):
-            if self.overlap(rect, l, pad=0):
+            if self.inside(l, rect, pad=0):
                 self.rexpand(r, l, pad=0)
                 chars.append(self.text[k])
                 self.table_chars.add(k)
@@ -172,9 +180,18 @@ class PopplerProcessor(object):
         """Returns the rest of a text, that is not
         recognized as data of a table.
         """
+        # (cl,cr,ct,cb) == bbox if not None
         chars = []
+        if bbox != None:
+            _ = bbrect = Poppler.Rectangle()
+            _.x1, _.x2, _.y1, _.y2 = bbox
+            assert _.x1 <= _.x2
+            assert _.y1 <= _.y2
         for i, char in enumerate(self.text):
-            if not i in self.table_chars: # FIXME add inside bbox removal.
+            if not i in self.table_chars:  # FIXME add inside bbox removal.
+                l = self.layout[i]
+                if bbox != None and self.inside(l, bbrect):
+                    continue
                 chars.append(char)
         return "".join(chars)
 
@@ -334,8 +351,9 @@ class Extractor(object):
 
         data, page = pdfdoc.get_image(pg - 1)  # Page numbers are 0-based.
 
-        curr_page = self.pages[pg] = etree.SubElement(
-            self.edoc, "page", number=str(pg))
+        curr_page = self.pages[pg] = etree.SubElement(self.edoc,
+                                                      "page",
+                                                      number=str(pg))
 
         #-----------------------------------------------------------------------
         # image load section.
@@ -378,8 +396,7 @@ class Extractor(object):
                 lrn = len(rectangles)
                 for k, r in enumerate(rectangles):
                     x1, y1, x2, y2 = [
-                        int(scale_to_pdf * float(k)) + pad
-                        for k in r
+                        int(scale_to_pdf * float(k)) + pad for k in r
                     ]
                     img[y1:y2, x1:x2] += col(random.random()).astype(uint8)
                 self.imsave(outfile + "-letters.png", img)
@@ -411,13 +428,15 @@ class Extractor(object):
         if r < width - 1:
             r = r + 1
 
-        scaled=[(_v-pad)*scale_to_pdf for _v in [l, t, r, b]]
-        [curr_page.set("bbox-"+_k, str(_v)) for _k, _v in zip(["left","top", "right","bottom"], scaled)]
-        (sl,st,sr,sb) = scaled
-        curr_page.set("bbox-width", str(abs(sr-sl)))
-        curr_page.set("bbox-height", str(abs(st-sb)))
+        scaled = [(_v - pad) * scale_to_pdf for _v in [l, t, r, b]]
+        [curr_page.set("bbox-" + _k, str(_v))
+         for _k, _v in zip(["left", "top", "right", "bottom"], scaled)]
+        (sl, st, sr, sb) = scaled
+        curr_page.set("bbox-width", str(abs(sr - sl)))
+        curr_page.set("bbox-height", str(abs(st - sb)))
         curr_page.set("bounding-box", " ".join(map(str, [sl, st, sr, sb])))
-        [curr_page.set(_k,str(_v)) for _k,_v in zip(["width","height"],page.get_size())]
+        [curr_page.set(_k, str(_v))
+         for _k, _v in zip(["width", "height"], page.get_size())]
 
         # Mark bounding box.
         # bmp[t, :] = False
@@ -582,9 +601,9 @@ class Extractor(object):
                     while 2 + (j + v) * 2 < len(hd) and not bot:
                         bot = False
                         for k in range(1, u + 1):
-                            bot |= isDiv(1, vd[2 * (i + k) - 1], vd[2 *
-                                                                    (i + k)],
-                                         hd[2 * (j + v)], hd[2 * (j + v) + 1])
+                            bot |= isDiv(1, vd[2 * (i + k) - 1],
+                                         vd[2 * (i + k)], hd[2 * (j + v)],
+                                         hd[2 * (j + v) + 1])
                         if not bot:
                             v = v + 1
                     cells.append((i, j, u, v))
@@ -646,26 +665,35 @@ class Extractor(object):
                 c.text = cl[-1]
             (i, j, u, v) = cl[:4]
             (cl, cr, ct, cb) = (vd[2 * i + 1], vd[2 * (i + u)], hd[2 * j + 1],
-                            hd[2 * (j + v)])
-            (cl, cr, ct, cb) = [(_v-pad)*scale_to_pdf for _v in (cl,cr,ct,cb)]
-            (cw, ch) = cr-cl, abs(ct-cb)
-            [c.set("bbox-"+k, str(v)) for k, v in zip(["left","right", "top", "bottom","width", "height"], map(str, (cl,cr,ct,cb, cw,ch)))]
+                                hd[2 * (j + v)])
+            (cl, cr, ct,
+             cb) = [(_v - pad) * scale_to_pdf for _v in (cl, cr, ct, cb)]
+            (cw, ch) = cr - cl, abs(ct - cb)
+            [c.set("bbox-" + k, str(v))
+             for k, v in zip(["left", "right", "top", "bottom", "width",
+                              "height"], map(str, (cl, cr, ct, cb, cw, ch)))]
             return cl, cr, ct, cb, i, j, u, v
 
-        table = etree.SubElement(curr_page, "table")
-        mat=numpy.array([cell_proc(table, cl) for cl in cells])
-        cl, cr, ct, cb = min(mat[:, 0]), max(mat[:,1]), min(mat[:,2]), max(mat[:,3])
-        _w, _h = max(mat[:,4]+mat[:,6])-1, max(mat[:,5]+mat[:,7])-1
-        cw=cr-cl
-        ch=cb-ct
-        [table.set("bbox-"+_k, str(_v)) for _k,_v in zip(
-            ["left","right","top","bottom","width","height"],
-                                                 [cl,cr,ct,cb,cw,ch]) ]
-        table.set("width", str(int(_w)))
-        table.set("height", str(int(_h)))
-        table.set("page", str(pg))
+        bbox = None
+        if cells:
+            table = etree.SubElement(curr_page, "table")
+            mat = numpy.array([cell_proc(table, cl) for cl in cells])
+            cl, cr, ct, cb = min(mat[:, 0]), max(mat[:, 1]), min(
+                mat[:, 2]), max(mat[:, 3])
+            _w, _h = max(mat[:, 4] + mat[:, 6]) - 1, max(mat[:, 5] +
+                                                         mat[:, 7]) - 1
+            cw = cr - cl
+            ch = cb - ct
+            [table.set("bbox-" + _k, str(_v))
+             for _k, _v in zip(["left", "right", "top", "bottom", "width",
+                                "height"], [cl, cr, ct, cb, cw, ch])]
+            table.set("width", str(int(_w)))
+            table.set("height", str(int(_h)))
+            table.set("page", str(pg))
+            bbox = (cl, cr, ct, cb)
+
         if self.rest_text:
-            text = pdfdoc.get_rest_text(bbox=(cl,cr,ct,cb))
+            text = pdfdoc.get_rest_text(bbox=bbox)
             self._text = text
 
         if text != None:
@@ -731,20 +759,19 @@ class Extractor(object):
             cells = self.cells(pg)
             text = self.texts(pg)
             pref = "page-{:04d}".format(pg)
-            output(
-                cells,
-                text=text,
-                pgs=None,
-                prefix=pref,
-                cells_csv_filename=cells_csv_filename,
-                cells_json_filename=cells_json_filename,
-                cells_xml_filename=cells_xml_filename,
-                table_csv_filename=table_csv_filename,
-                table_html_filename=table_html_filename,
-                table_list_filename=table_list_filename,
-                infile=self.infile,
-                name=name,
-                output_type=output_type)
+            output(cells,
+                   text=text,
+                   pgs=None,
+                   prefix=pref,
+                   cells_csv_filename=cells_csv_filename,
+                   cells_json_filename=cells_json_filename,
+                   cells_xml_filename=cells_xml_filename,
+                   table_csv_filename=table_csv_filename,
+                   table_html_filename=table_html_filename,
+                   table_list_filename=table_list_filename,
+                   infile=self.infile,
+                   name=name,
+                   output_type=output_type)
 
 #-----------------------------------------------------------------------
 #output section.
@@ -765,14 +792,15 @@ def output(cells,
            prefix=None):
 
     output_types = [
-        dict(
-            filename=cells_csv_filename, function=o_cells_csv), dict(
-                filename=cells_json_filename, function=o_cells_json), dict(
-                    filename=cells_xml_filename, function=o_cells_xml), dict(
-                        filename=table_csv_filename, function=o_table_csv),
-        dict(
-            filename=table_html_filename, function=o_table_html), dict(
-                filename=table_list_filename, function=o_table_list)
+        dict(filename=cells_csv_filename,
+             function=o_cells_csv), dict(filename=cells_json_filename,
+                                         function=o_cells_json),
+        dict(filename=cells_xml_filename,
+             function=o_cells_xml), dict(filename=table_csv_filename,
+                                         function=o_table_csv),
+        dict(filename=table_html_filename,
+             function=o_table_html), dict(filename=table_list_filename,
+                                          function=o_table_list)
     ]
 
     for entry in output_types:
@@ -944,9 +972,8 @@ def o_table_html(cells,
             if j > oj or pg > opg:
                 if pg > opg:
                     s = "Name: " + name + ", " if name else ""
-                    table.append(
-                        etree.Comment(s + ("Source: %s page %d." % (infile, pg)
-                                           )))
+                    table.append(etree.Comment(s + ("Source: %s page %d." % (
+                        infile, pg))))
                 #if tr:
                 #    table.appendChild(tr)
                 #tr = doc.createElement("tr")
@@ -963,9 +990,10 @@ def o_table_html(cells,
             if output_type == "table_chtml":
                 td.set("style", "background-color: #%02x%02x%02x" %
                        tuple(128 + col(k / (nc + 0.))))
-    outfile.write(
-        etree.tostring(
-            doc, method="html", pretty_print=True, encoding="UTF-8"))
+    outfile.write(etree.tostring(doc,
+                                 method="html",
+                                 pretty_print=True,
+                                 encoding="UTF-8"))
 
 
 def process_page(infile, pgs, **kwargs):
