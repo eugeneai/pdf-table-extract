@@ -51,8 +51,6 @@ class PopplerProcessor(object):
         if index < 0 or index >= self.page_num:
             raise IndexError("page number is out of bounds")
         page = self.document.get_page(index)
-        if self.layout != None:
-            self.layout = None
         self.text = page.get_text()
         self.attributes = page.get_text_attributes()
         self.table_chars = set()
@@ -261,6 +259,7 @@ class Extractor(object):
                  rest_text=True,    # Return the rest of text as second parameter):
                  notify=None,
                  imsave=None,
+                 page_layout=True,  # Try to follow page layout from top to bottom.
                  ):
         debug = False
         self.infile = infile
@@ -322,6 +321,7 @@ class Extractor(object):
         else:
             self.set_pages(startpage, endpage)
         self.edoc = self.etree = None
+        self.page_layout=page_layout
 
     def set_pages(self, startpage, endpage=None):
         if startpage==None:
@@ -687,8 +687,9 @@ class Extractor(object):
             return cl, cr, ct, cb, i, j, u, v
 
         bbox = None
+        table = None
         if cells:
-            table = etree.SubElement(curr_page, "table")
+            table = etree.Element("table")
             mat = numpy.array([cell_proc(table, cl) for cl in cells])
             cl, cr, ct, cb = min(mat[:, 0]), max(mat[:, 1]), min(
                 mat[:, 2]), max(mat[:, 3])
@@ -704,13 +705,70 @@ class Extractor(object):
             table.set("page", str(pg))
             bbox = (cl, cr, ct, cb)
 
+        etext=None
         if self.rest_text:
-            text = pdfdoc.get_rest_text(bbox=bbox)
-            self._text = text
+            if self.page_layout:
+                self.follow_layout(page, curr_page, table)
+            else:
+                if table != None:
+                    curr_page.append(table)
+                text = pdfdoc.get_rest_text(bbox=bbox)
 
-        if text != None:
-            etext = etree.SubElement(curr_page, "text")
-            etext.text = text
+                if text != None:
+                    etext = etree.Element("text")
+                    etext.text = text
+                if etext != None:
+                    curr_page.append(etext)
+
+    def follow_layout(self, page, curr_page, table=None):
+        # FIXME Implemented a very simple method
+        # just enumerating chars making string with them
+        # till \n will not found
+        bbox=None
+        if table!=None:
+            bbox=l,t,r,b=[float(table.get("bbox-"+k)) for k in ["left","top","right","bottom"]]
+        chars=[]
+        l,t,r,b=str_bb=(1e10,1e10,-1e10,-1e10)
+        if bbox != None:
+            _ = bbrect = Poppler.Rectangle()
+            _.x1, _.y1, _.x2, _.y2 = bbox
+            assert _.x1 <= _.x2
+            assert _.y1 <= _.y2
+        text=etree.Element("text")
+
+        def store():
+            line=etree.SubElement(text, "line")
+            line.text="".join(chars)
+            h=b-t
+            w=r-l
+            [line.set("bbox-"+k,str(v)) for k,v in zip(["left","top","right","bottom","width","height"],[l,t,r,b,w,h])]
+
+        for i, _ in enumerate(zip(self.pdfdoc.layout, self.pdfdoc.text)):
+            la, c = _
+            if i in self.pdfdoc.table_chars: # the character is already in a table.
+                if table==None:
+                    continue
+                else:
+                    if len(text)>0:
+                        curr_page.append(text)
+                        text=etree.Element("text")
+                    curr_page.append(table)
+                    table=None
+            if bbox != None and self.pdfdoc.inside(la, bbrect):
+                continue
+            chars.append(c)
+            if l>la.x1: l=la.x1
+            if t>la.y1: t=la.y1
+            if r<la.x2: r=la.x2
+            if b<la.y2: b=la.y2
+            if c=="\n":
+                store()
+                chars=[]
+                l,t,r,b=str_bb=(1e10,1e10,-1e10,-1e10)
+        if len(chars)>0:
+            store()
+        if len(text)>0:
+            curr_page.append(text)
 
     def xml_write(self, f):
         self.etree.write(f, pretty_print=True, encoding="UTF-8")

@@ -34,3 +34,12 @@ class test_examples:
         self.proc.process()
         self.proc.xml_write(o)
         o.close()
+
+
+    def test_page_with_table(self):
+        outfile="test_text_and_table_page.xml"
+        o=open(outfile,"wb")
+        self.proc.set_pages(36)
+        self.proc.process()
+        self.proc.xml_write(o)
+        o.close()
