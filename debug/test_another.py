@@ -3,6 +3,10 @@ import pdftableextract as pdf
 import pprint
 
 DEBUG = False
+start_page = 1
+end_page = 240
+infile = "059285.pdf"
+outfilename = "out/{}-059285.html"
 
 if DEBUG:
     import random
@@ -11,16 +15,11 @@ if DEBUG:
     from matplotlib.image import imsave
 
     def debug_imsave(name, image):
-        namw = "out/" + name
         print("DEBUG: Saving {}".format(name))
         imsave(name, image)
 else:
     debug_imsave = None
 
-start_page = 1
-end_page = 240
-infile = "059285.pdf"
-outfilename = "out/{}-059285.html"
 checkall = DEBUG
 out_xml = outfilename.replace(
     "html", "xml").format("xml-{}-{}".format(start_page, end_page))
@@ -38,6 +37,7 @@ proc = pdf.Extractor(infile=infile,
                      bitmap_resolution=72,
                      greyscale_threshold=50,
                      notify=notify_page,
+                     line_length=2,
                      imsave=debug_imsave, )
 
 proc.process()

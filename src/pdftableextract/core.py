@@ -1,7 +1,8 @@
 import sys
 import os
 
-from numpy import array, fromstring, ones, zeros, uint8, diff, where, sum, delete, frombuffer, reshape, all, any
+from numpy import array, ones, zeros, uint8, diff, where, sum
+from numpy import delete, frombuffer, reshape, all, any
 import numpy
 
 #from xml.dom.minidom import getDOMImplementation
@@ -12,7 +13,7 @@ import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('Poppler', '0.18')
 gi.require_version('Gdk', '3.0')
-from gi.repository import Gdk, Poppler  #, Glib
+from gi.repository import Gdk, Poppler
 import cairo
 import collections
 
