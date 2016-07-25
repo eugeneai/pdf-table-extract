@@ -727,8 +727,6 @@ class Extractor(object):
         bbox=None
         if table!=None:
             bbox=l,t,r,b=[float(table.get("bbox-"+k)) for k in ["left","top","right","bottom"]]
-        chars=[]
-        l,t,r,b=str_bb=(1e10,1e10,-1e10,-1e10)
         if bbox != None:
             _ = bbrect = Poppler.Rectangle()
             _.x1, _.y1, _.x2, _.y2 = bbox
@@ -736,15 +734,62 @@ class Extractor(object):
             assert _.y1 <= _.y2
         text=etree.Element("text")
 
-        def store():
-            line=etree.SubElement(text, "line")
-            line.text="".join(chars)
+        attributes = page.get_text_attributes()
+        lattrs = len(attributes)
+        aidx=0
+        attr_dict={}
+
+        def store(line, endline=False):
+            style=etree.SubElement(line, "style")
+            style.text="".join(chars)
+            [style.set(k,str(v)) for k,v in attr_dict.items()] # .attrib.updat(.)? FIXME
             h=b-t
             w=r-l
-            [line.set("bbox-"+k,str(v)) for k,v in zip(["left","top","right","bottom","width","height"],[l,t,r,b,w,h])]
+            if endline:
+                [line.set("bbox-"+k,str(v)) for k,v in zip(["left","top","right","bottom","width","height"],[l,t,r,b,w,h])]
+                if len(line)>0:
+                    text.append(line)
+
+        def get_attrs(i):
+            global aidx, lattrs, attributes, attr_dict
+            answer={}
+            step=False
+            while True:
+                if aidx>=lattrs:
+                    raise RuntimeError("wrong sequence")
+                attr=attributes[aidx]
+                if i>=attr.start_index and i<=attr.end_index :
+                    if not step:
+                        return step, attr_dict
+                    _=color=attr.color
+                    color=_.red,_.green,_blue
+                    color="{:f} {:f} {:f}".format(*color)
+                    answer["color"]=color
+                    answer["underline"]="1" if attr.is_underlined else "0"
+                    answer["font-spec"]=attr.font_name
+                    font_name, modifiers=attr.font_name.split(",",1)
+                    answer["font-name"]=font_name
+                    modifiers=modifiers.lower().split(",")
+                    answer["bold"]="1" if "bold" in modifiers else "0"
+                    answer["italic"]="1" if "italic" in modifiers else "0"
+                    answer["modifiers"] = " ".join(modifiers)
+                    answer["font-sixe"]=str(attr.font_size)
+                    attr_dict.clear()
+                    attr_dict.update(answer)
+                    return step, attr_dict
+                else:
+                    step=True
+                    aidx+=1
+            assert False
+
+        style=None
+        chars=[]
+        l,t,r,b=str_bb=(1e10,1e10,-1e10,-1e10)
+        line=etree.Element("line")
 
         for i, _ in enumerate(zip(self.pdfdoc.layout, self.pdfdoc.text)):
             la, c = _
+            step,_ = get_attrs(i)
             if i in self.pdfdoc.table_chars: # the character is already in a table.
                 if table==None:
                     continue
@@ -752,8 +797,10 @@ class Extractor(object):
                     if len(text)>0:
                         curr_page.append(text)
                         text=etree.Element("text")
+                        line=etree.Element("line")
                     curr_page.append(table)
                     table=None
+                    style=None
             if bbox != None and self.pdfdoc.inside(la, bbrect):
                 continue
             chars.append(c)
@@ -761,12 +808,15 @@ class Extractor(object):
             if t>la.y1: t=la.y1
             if r<la.x2: r=la.x2
             if b<la.y2: b=la.y2
-            if c=="\n":
-                store()
+            if c=="\n" or step:
+                endline=c=="\n"
+                store(line, endline=endline)
                 chars=[]
-                l,t,r,b=str_bb=(1e10,1e10,-1e10,-1e10)
+                if endline:
+                    l,t,r,b=str_bb=(1e10,1e10,-1e10,-1e10)
+                    style=None
         if len(chars)>0:
-            store()
+            store(line,endline=True)
         if len(text)>0:
             curr_page.append(text)
 
@@ -805,10 +855,10 @@ class Extractor(object):
         """
         if pg != None:
             node = self.pages[pg]
-            etexts = node.iterfind("text")
+            etexts = node.iterfind("text/line")
         else:
             node = self.edoc
-            etexts = node.iterfind(".//text")
+            etexts = node.iterfind(".//text/line")
         text = "".join([_e.text for _e in etexts])
         return text
 

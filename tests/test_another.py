@@ -4,7 +4,7 @@ import pprint
 
 DEBUG = False
 start_page = 1
-end_page = 13
+end_page = 240
 infile = "059285.pdf"
 outfilename = "out/{}-059285.html"
 
