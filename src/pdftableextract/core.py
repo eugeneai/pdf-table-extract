@@ -320,13 +320,24 @@ class Extractor(object):
                 list(map(int, (str(pgs).split(":")))) + [None, None])[0:3]
             self.pgs = range(pgs, pgs + 1)
         else:
-            self.pgs = range(startpage, endpage + 1)
-            self.frow = self.lrow = None
+            self.set_pages(startpage, endpage)
         self.edoc = self.etree = None
+
+    def set_pages(self, startpage, endpage=None):
+        if startpage==None:
+            self.pgs=None
+            return
+        elif endpage==None:
+            endpage=startpage
+        self.pgs = range(startpage, endpage + 1)
+        self.frow = self.lrow = None
+
 
     def initialize(self):
         """Initializes internal structures.
         """
+        if self.pgs == None:
+            raise ValueError("pages to be processed are not set")
         pdfdoc = self.pdfdoc = PopplerProcessor(self.infile)
         pdfdoc.resolution = self.bitmap_resolution
         pdfdoc.greyscale_threshold = self.greyscale_threshold
