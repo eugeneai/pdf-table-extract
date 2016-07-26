@@ -724,7 +724,8 @@ class Extractor(object):
         # FIXME Implemented a very simple method
         # just enumerating chars making string with them
         # till \n will not found
-        bbox=None
+
+        sbbox=None
         if table!=None:
             bbox=l,t,r,b=[float(table.get("bbox-"+k)) for k in ["left","top","right","bottom"]]
         if bbox != None:
@@ -732,12 +733,22 @@ class Extractor(object):
             _.x1, _.y1, _.x2, _.y2 = bbox
             assert _.x1 <= _.x2
             assert _.y1 <= _.y2
-        text=etree.Element("text")
 
-        attributes = page.get_text_attributes()
-        lattrs = len(attributes)
-        aidx=0
-        attr_dict={}
+        class Context(object):
+            pass
+
+        ctx=Context()
+        ctx.text=etree.Element("text")
+        ctx.style=None
+        ctx.chars=[]
+        l,t,r,b=str_bb=(1e10,1e10,-1e10,-1e10)
+        ctx.line=etree.Element("line")
+
+        ctx.attributes = page.get_text_attributes()
+        ctx.lattrs = len(attributes)
+        ctx.aidx=0
+        ctx.attr_dict={}
+
 
         def store(line, endline=False):
             style=etree.SubElement(line, "style")
@@ -781,11 +792,6 @@ class Extractor(object):
                     step=True
                     aidx+=1
             assert False
-
-        style=None
-        chars=[]
-        l,t,r,b=str_bb=(1e10,1e10,-1e10,-1e10)
-        line=etree.Element("line")
 
         for i, _ in enumerate(zip(self.pdfdoc.layout, self.pdfdoc.text)):
             la, c = _
