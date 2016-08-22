@@ -9,7 +9,6 @@ infile = "059285.pdf"
 outfilename = "out/{}-059285.html"
 
 if DEBUG:
-    import random
     import matplotlib
     matplotlib.use('AGG')
     from matplotlib.image import imsave
@@ -29,18 +28,19 @@ def notify_page(page):
     print("Processing page {:04d}.".format(page))
 
 
-proc = pdf.Extractor(infile=infile,
-                     checkall=checkall,
-                     startpage=start_page,
-                     endpage=end_page,
-                     outfilename=outfilename,
-                     bitmap_resolution=72,
-                     greyscale_threshold=50,
-                     notify=notify_page,
-                     line_length=2,
-                     imsave=debug_imsave, )
+proc = pdf.Extractor(
+    infile=infile,
+    checkall=checkall,
+    startpage=start_page,
+    endpage=end_page,
+    outfilename=outfilename,
+    bitmap_resolution=72,
+    greyscale_threshold=50,
+    notify=notify_page,
+    line_length=2,
+    imsave=debug_imsave, )
 
-if __name__=="__main__":
+if __name__ == "__main__":
     proc.process()
 
     cells = proc.cells()

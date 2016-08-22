@@ -1,5 +1,5 @@
 from __future__ import print_function
-from nose.tools import *
+from nose.tools import raises
 import pdftableextract as pdf
 import pprint
 import os.path
@@ -7,19 +7,21 @@ import os.path
 DEBUG = False
 start_page = 1
 end_page = 13
-infile = os.path.join(os.path.dirname(__file__),"059285.pdf")
+infile = os.path.join(os.path.dirname(__file__), "059285.pdf")
 outfilename = "out/{}-059285.html"
-checkall=DEBUG
+checkall = DEBUG
+
 
 class test_examples:
     def setUp(self):
-        self.proc = pdf.Extractor(infile=infile,
-                                  checkall=checkall,
-                                  outfilename=outfilename,
-                                  bitmap_resolution=72,
-                                  greyscale_threshold=50,
-                                  line_length=2,
-                                  )
+        self.proc = pdf.Extractor(
+            infile=infile,
+            checkall=checkall,
+            outfilename=outfilename,
+            bitmap_resolution=72,
+            greyscale_threshold=50,
+            line_length=2, )
+
     def tearDown(self):
         del self.proc
 
@@ -28,17 +30,16 @@ class test_examples:
         self.proc.process()
 
     def test_text_page(self):
-        outfile="test_text_page.xml"
-        o=open(outfile,"wb")
+        outfile = "test_text_page.xml"
+        o = open(outfile, "wb")
         self.proc.set_pages(1)
         self.proc.process()
         self.proc.xml_write(o)
         o.close()
 
-
     def test_page_with_table(self):
-        outfile="test_text_and_table_page.xml"
-        o=open(outfile,"wb")
+        outfile = "test_text_and_table_page.xml"
+        o = open(outfile, "wb")
         self.proc.set_pages(36)
         self.proc.process()
         self.proc.xml_write(o)
