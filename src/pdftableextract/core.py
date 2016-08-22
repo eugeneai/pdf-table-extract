@@ -321,17 +321,16 @@ class Extractor(object):
         else:
             self.set_pages(startpage, endpage)
         self.edoc = self.etree = None
-        self.page_layout=page_layout
+        self.page_layout = page_layout
 
     def set_pages(self, startpage, endpage=None):
-        if startpage==None:
-            self.pgs=None
+        if startpage == None:
+            self.pgs = None
             return
-        elif endpage==None:
-            endpage=startpage
+        elif endpage == None:
+            endpage = startpage
         self.pgs = range(startpage, endpage + 1)
         self.frow = self.lrow = None
-
 
     def initialize(self):
         """Initializes internal structures.
@@ -363,9 +362,8 @@ class Extractor(object):
 
         data, page = pdfdoc.get_image(pg - 1)  # Page numbers are 0-based.
 
-        curr_page = self.pages[pg] = etree.SubElement(self.edoc,
-                                                      "page",
-                                                      number=str(pg))
+        curr_page = self.pages[pg] = etree.SubElement(
+            self.edoc, "page", number=str(pg))
 
         #-----------------------------------------------------------------------
         # image load section.
@@ -613,9 +611,9 @@ class Extractor(object):
                     while 2 + (j + v) * 2 < len(hd) and not bot:
                         bot = False
                         for k in range(1, u + 1):
-                            bot |= isDiv(1, vd[2 * (i + k) - 1],
-                                         vd[2 * (i + k)], hd[2 * (j + v)],
-                                         hd[2 * (j + v) + 1])
+                            bot |= isDiv(1, vd[2 * (i + k) - 1], vd[2 *
+                                                                    (i + k)],
+                                         hd[2 * (j + v)], hd[2 * (j + v) + 1])
                         if not bot:
                             v = v + 1
                     cells.append((i, j, u, v))
@@ -705,7 +703,7 @@ class Extractor(object):
             table.set("page", str(pg))
             bbox = (cl, cr, ct, cb)
 
-        etext=None
+        etext = None
         if self.rest_text:
             if self.page_layout:
                 self.follow_layout(page, curr_page, table)
@@ -725,9 +723,10 @@ class Extractor(object):
         # just enumerating chars making string with them
         # till \n will not found
 
-        sbbox=None
-        if table!=None:
-            bbox=l,t,r,b=[float(table.get("bbox-"+k)) for k in ["left","top","right","bottom"]]
+        sbbox = None
+        if table != None:
+            bbox = l, t, r, b = [float(table.get("bbox-" + k))
+                                 for k in ["left", "top", "right", "bottom"]]
         if bbox != None:
             _ = bbrect = Poppler.Rectangle()
             _.x1, _.y1, _.x2, _.y2 = bbox
@@ -737,94 +736,101 @@ class Extractor(object):
         class Context(object):
             pass
 
-        ctx=Context()
-        ctx.text=etree.Element("text")
-        ctx.style=None
-        ctx.chars=[]
-        l,t,r,b=str_bb=(1e10,1e10,-1e10,-1e10)
-        ctx.line=etree.Element("line")
+        ctx = Context()
+        ctx.text = etree.Element("text")
+        ctx.style = None
+        ctx.chars = []
+        l, t, r, b = str_bb = (1e10, 1e10, -1e10, -1e10)
+        ctx.line = etree.Element("line")
 
         ctx.attributes = page.get_text_attributes()
-        ctx.lattrs = len(attributes)
-        ctx.aidx=0
-        ctx.attr_dict={}
+        ctx.lattrs = len(ctx.attributes)
+        ctx.aidx = 0
+        ctx.attr_dict = {}
 
-
-        def store(line, endline=False):
-            style=etree.SubElement(line, "style")
-            style.text="".join(chars)
-            [style.set(k,str(v)) for k,v in attr_dict.items()] # .attrib.updat(.)? FIXME
-            h=b-t
-            w=r-l
+        def store(ctx, endline=False):
+            style = etree.SubElement(ctx.line, "style")
+            style.text = "".join(ctx.chars)
+            [style.set(k, str(v))
+             for k, v in ctx.attr_dict.items()]  # .attrib.updat(.)? FIXME
+            h = b - t
+            w = r - l
             if endline:
-                [line.set("bbox-"+k,str(v)) for k,v in zip(["left","top","right","bottom","width","height"],[l,t,r,b,w,h])]
-                if len(line)>0:
-                    text.append(line)
+                [ctx.line.set("bbox-" + k, str(v))
+                 for k, v in zip(["left", "top", "right", "bottom", "width",
+                                  "height"], [l, t, r, b, w, h])]
+                if len(ctx.line) > 0:
+                    ctx.text.append(ctx.line)
 
-        def get_attrs(i):
-            global aidx, lattrs, attributes, attr_dict
-            answer={}
-            step=False
+        def get_attrs(i, ctx):
+            # global aidx, lattrs, attributes, attr_dict
+            answer = {}
+            step = False
             while True:
-                if aidx>=lattrs:
+                if ctx.aidx >= ctx.lattrs:
                     raise RuntimeError("wrong sequence")
-                attr=attributes[aidx]
-                if i>=attr.start_index and i<=attr.end_index :
+                attr = ctx.attributes[ctx.aidx]
+                if i >= attr.start_index and i <= attr.end_index:
                     if not step:
-                        return step, attr_dict
-                    _=color=attr.color
-                    color=_.red,_.green,_blue
-                    color="{:f} {:f} {:f}".format(*color)
-                    answer["color"]=color
-                    answer["underline"]="1" if attr.is_underlined else "0"
-                    answer["font-spec"]=attr.font_name
-                    font_name, modifiers=attr.font_name.split(",",1)
-                    answer["font-name"]=font_name
-                    modifiers=modifiers.lower().split(",")
-                    answer["bold"]="1" if "bold" in modifiers else "0"
-                    answer["italic"]="1" if "italic" in modifiers else "0"
+                        return step, ctx.attr_dict
+                    _ = color = attr.color
+                    color = _.red, _.green, _.blue
+                    color = "{:f} {:f} {:f}".format(*color)
+                    answer["color"] = color
+                    answer["underline"] = "1" if attr.is_underlined else "0"
+                    answer["font-spec"] = attr.font_name
+                    aname = attr.font_name.split(",", 1)
+                    if len(aname) >= 2:
+                        font_name, modifiers = aname
+                    else:
+                        font_name = aname
+                        modifiers = ""
+                    answer["font-name"] = font_name
+                    modifiers = modifiers.lower().split(",")
+                    answer["bold"] = "1" if "bold" in modifiers else "0"
+                    answer["italic"] = "1" if "italic" in modifiers else "0"
                     answer["modifiers"] = " ".join(modifiers)
-                    answer["font-sixe"]=str(attr.font_size)
-                    attr_dict.clear()
-                    attr_dict.update(answer)
-                    return step, attr_dict
+                    answer["font-sixe"] = str(attr.font_size)
+                    ctx.attr_dict.clear()
+                    ctx.attr_dict.update(answer)
+                    return step, ctx.attr_dict
                 else:
-                    step=True
-                    aidx+=1
+                    step = True
+                    ctx.aidx += 1
             assert False
 
         for i, _ in enumerate(zip(self.pdfdoc.layout, self.pdfdoc.text)):
             la, c = _
-            step,_ = get_attrs(i)
-            if i in self.pdfdoc.table_chars: # the character is already in a table.
-                if table==None:
+            step, _ = get_attrs(i, ctx)
+            if i in self.pdfdoc.table_chars:  # the character is already in a table.
+                if table == None:
                     continue
                 else:
-                    if len(text)>0:
-                        curr_page.append(text)
-                        text=etree.Element("text")
-                        line=etree.Element("line")
+                    if len(ctx.text) > 0:
+                        curr_page.append(ctx.text)
+                        ctx.text = etree.Element("text")
+                        ctx.line = etree.Element("line")
                     curr_page.append(table)
-                    table=None
-                    style=None
+                    table = None
+                    style = None
             if bbox != None and self.pdfdoc.inside(la, bbrect):
                 continue
-            chars.append(c)
-            if l>la.x1: l=la.x1
-            if t>la.y1: t=la.y1
-            if r<la.x2: r=la.x2
-            if b<la.y2: b=la.y2
-            if c=="\n" or step:
-                endline=c=="\n"
-                store(line, endline=endline)
-                chars=[]
+            ctx.chars.append(c)
+            if l > la.x1: l = la.x1
+            if t > la.y1: t = la.y1
+            if r < la.x2: r = la.x2
+            if b < la.y2: b = la.y2
+            if c == "\n" or step:
+                endline = c == "\n"
+                store(ctx, endline=endline)
+                ctx.chars = []
                 if endline:
-                    l,t,r,b=str_bb=(1e10,1e10,-1e10,-1e10)
-                    style=None
-        if len(chars)>0:
-            store(line,endline=True)
-        if len(text)>0:
-            curr_page.append(text)
+                    l, t, r, b = sbbox = (1e10, 1e10, -1e10, -1e10)
+                    style = None
+        if len(ctx.chars) > 0:
+            store(ctx, endline=True)
+        if len(ctx.text) > 0:
+            curr_page.append(ctx.text)
 
     def xml_write(self, f):
         self.etree.write(f, pretty_print=True, encoding="UTF-8")
@@ -885,19 +891,20 @@ class Extractor(object):
             cells = self.cells(pg)
             text = self.texts(pg)
             pref = "page-{:04d}".format(pg)
-            output(cells,
-                   text=text,
-                   pgs=None,
-                   prefix=pref,
-                   cells_csv_filename=cells_csv_filename,
-                   cells_json_filename=cells_json_filename,
-                   cells_xml_filename=cells_xml_filename,
-                   table_csv_filename=table_csv_filename,
-                   table_html_filename=table_html_filename,
-                   table_list_filename=table_list_filename,
-                   infile=self.infile,
-                   name=name,
-                   output_type=output_type)
+            output(
+                cells,
+                text=text,
+                pgs=None,
+                prefix=pref,
+                cells_csv_filename=cells_csv_filename,
+                cells_json_filename=cells_json_filename,
+                cells_xml_filename=cells_xml_filename,
+                table_csv_filename=table_csv_filename,
+                table_html_filename=table_html_filename,
+                table_list_filename=table_list_filename,
+                infile=self.infile,
+                name=name,
+                output_type=output_type)
 
 #-----------------------------------------------------------------------
 #output section.
@@ -918,15 +925,14 @@ def output(cells,
            prefix=None):
 
     output_types = [
-        dict(filename=cells_csv_filename,
-             function=o_cells_csv), dict(filename=cells_json_filename,
-                                         function=o_cells_json),
-        dict(filename=cells_xml_filename,
-             function=o_cells_xml), dict(filename=table_csv_filename,
-                                         function=o_table_csv),
-        dict(filename=table_html_filename,
-             function=o_table_html), dict(filename=table_list_filename,
-                                          function=o_table_list)
+        dict(
+            filename=cells_csv_filename, function=o_cells_csv), dict(
+                filename=cells_json_filename, function=o_cells_json), dict(
+                    filename=cells_xml_filename, function=o_cells_xml), dict(
+                        filename=table_csv_filename, function=o_table_csv),
+        dict(
+            filename=table_html_filename, function=o_table_html), dict(
+                filename=table_list_filename, function=o_table_list)
     ]
 
     for entry in output_types:
@@ -1098,8 +1104,9 @@ def o_table_html(cells,
             if j > oj or pg > opg:
                 if pg > opg:
                     s = "Name: " + name + ", " if name else ""
-                    table.append(etree.Comment(s + ("Source: %s page %d." % (
-                        infile, pg))))
+                    table.append(
+                        etree.Comment(s + ("Source: %s page %d." % (infile, pg)
+                                           )))
                 #if tr:
                 #    table.appendChild(tr)
                 #tr = doc.createElement("tr")
@@ -1116,10 +1123,9 @@ def o_table_html(cells,
             if output_type == "table_chtml":
                 td.set("style", "background-color: #%02x%02x%02x" %
                        tuple(128 + col(k / (nc + 0.))))
-    outfile.write(etree.tostring(doc,
-                                 method="html",
-                                 pretty_print=True,
-                                 encoding="UTF-8"))
+    outfile.write(
+        etree.tostring(
+            doc, method="html", pretty_print=True, encoding="UTF-8"))
 
 
 def process_page(infile, pgs, **kwargs):
