@@ -723,7 +723,7 @@ class Extractor(object):
         # just enumerating chars making string with them
         # till \n will not found
 
-        sbbox = None
+        bbox = None
         if table != None:
             bbox = l, t, r, b = [float(table.get("bbox-" + k))
                                  for k in ["left", "top", "right", "bottom"]]
@@ -825,7 +825,7 @@ class Extractor(object):
                 store(ctx, endline=endline)
                 ctx.chars = []
                 if endline:
-                    l, t, r, b = sbbox = (1e10, 1e10, -1e10, -1e10)
+                    l, t, r, b = (1e10, 1e10, -1e10, -1e10)
                     style = None
         if len(ctx.chars) > 0:
             store(ctx, endline=True)
