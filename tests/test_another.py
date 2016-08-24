@@ -4,7 +4,7 @@ import pprint
 
 DEBUG = False
 start_page = 1
-end_page = 240
+end_page = 12
 infile = "059285.pdf"
 outfilename = "out/{}-059285.html"
 
@@ -25,7 +25,7 @@ out_xml = outfilename.replace(
 
 
 def notify_page(page):
-    print("Processing page {:04d}.".format(page))
+    print("Processing page {:04d}.".format(page), end='\r')
 
 
 proc = pdf.Extractor(
@@ -37,7 +37,7 @@ proc = pdf.Extractor(
     bitmap_resolution=72,
     greyscale_threshold=50,
     notify=notify_page,
-    line_length=2,
+    line_length=0.2,
     imsave=debug_imsave, )
 
 if __name__ == "__main__":
@@ -45,6 +45,6 @@ if __name__ == "__main__":
 
     cells = proc.cells()
 
-    proc.output(table_html_filename=outfilename)
-
     proc.xml_write(open(out_xml, 'wb'))
+
+    proc.output(table_html_filename=outfilename)

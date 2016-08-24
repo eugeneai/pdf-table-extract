@@ -721,13 +721,13 @@ class Extractor(object):
     def follow_layout(self, page, curr_page, table=None):
         # FIXME Implemented a very simple method
         # just enumerating chars making string with them
-        # till \n will not found
+        # till \n will found
 
         bbox = None
-        if table != None:
+        if table is not None:
             bbox = l, t, r, b = [float(table.get("bbox-" + k))
                                  for k in ["left", "top", "right", "bottom"]]
-        if bbox != None:
+        if bbox is not None:
             _ = bbrect = Poppler.Rectangle()
             _.x1, _.y1, _.x2, _.y2 = bbox
             assert _.x1 <= _.x2
@@ -752,7 +752,7 @@ class Extractor(object):
             style = etree.SubElement(ctx.line, "style")
             style.text = "".join(ctx.chars)
             [style.set(k, str(v))
-             for k, v in ctx.attr_dict.items()]  # .attrib.updat(.)? FIXME
+             for k, v in ctx.attr_dict.items()]  # .attrib.update(.)? FIXME
             h = b - t
             w = r - l
             if endline:
@@ -761,6 +761,7 @@ class Extractor(object):
                                   "height"], [l, t, r, b, w, h])]
                 if len(ctx.line) > 0:
                     ctx.text.append(ctx.line)
+                    ctx.line = etree.Element("line")
 
         def get_attrs(i, ctx):
             # global aidx, lattrs, attributes, attr_dict
@@ -783,14 +784,14 @@ class Extractor(object):
                     if len(aname) >= 2:
                         font_name, modifiers = aname
                     else:
-                        font_name = aname
+                        font_name = aname[0]
                         modifiers = ""
                     answer["font-name"] = font_name
                     modifiers = modifiers.lower().split(",")
                     answer["bold"] = "1" if "bold" in modifiers else "0"
                     answer["italic"] = "1" if "italic" in modifiers else "0"
                     answer["modifiers"] = " ".join(modifiers)
-                    answer["font-sixe"] = str(attr.font_size)
+                    answer["font-size"] = str(attr.font_size)
                     ctx.attr_dict.clear()
                     ctx.attr_dict.update(answer)
                     return step, ctx.attr_dict
@@ -820,8 +821,8 @@ class Extractor(object):
             if t > la.y1: t = la.y1
             if r < la.x2: r = la.x2
             if b < la.y2: b = la.y2
-            if c == "\n" or step:
-                endline = c == "\n"
+            endline = c == "\n"
+            if endline or step:
                 store(ctx, endline=endline)
                 ctx.chars = []
                 if endline:
@@ -865,13 +866,28 @@ class Extractor(object):
     def texts(self, pg=None):
         """Return all the cells found.
         """
-        if pg != None:
+        q = "text/line/style"
+
+        if pg is None:
             node = self.pages[pg]
-            etexts = node.iterfind("text/line")
         else:
+            q = ".//" + q
             node = self.edoc
-            etexts = node.iterfind(".//text/line")
-        text = "".join([_e.text for _e in etexts])
+
+        styles = node.iterfind(q)
+        text = ""
+        t=etree.Element("text")
+        for s in styles:
+            b = i = False
+            b = s.get("bold","0") == "1"
+            i = s.get("italic","0") == "1"
+            t = s.text
+            if i:
+                t = "<i>" + t + "</i>"
+            if b:
+                t = "<b>" + t + "</b>"
+            text += t
+        # text = "".join([_e.text for _e in etexts])
         return text
 
     def output(self,
@@ -1009,8 +1025,11 @@ def o_cells_xml(cells,
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     if text != None:
         root = etree.Element("document")
-        t = etree.SubElement(root, "text")
-        t.text = text
+        if isinstance(text, str):
+            t = etree.SubElement(root, "text")
+            t.text = text
+        else:
+            t = text
         root.append(table)
         doc = etree.ElementTree(root)
     else:
@@ -1081,15 +1100,18 @@ def o_table_html(cells,
     opg = 0
     doc = etree.Element("div")
     div = root = doc
-    if text != None and text.strip():
-        p = etree.SubElement(div, "p")
-        p.set("align", "justify")
-        text = text.rstrip()
-        pars = text.split("\n")
-        for par in pars:
-            _div = etree.SubElement(p, "div")
-            _div.set("class", "sentence")
-            _div.text = par
+    if text is not None:
+        if isinstance(text, str) and text.strip():
+            p = etree.SubElement(div, "p")
+            p.set("align", "justify")
+            text = text.rstrip()
+            pars = text.split("\n")
+            for par in pars:
+                _div = etree.SubElement(p, "div")
+                _div.set("class", "sentence")
+                _div.text = par
+        elif isinstance(text, list):
+            raise RuntimeError("not implemented")
 
     nc = len(cells)
     if nc > 0:
