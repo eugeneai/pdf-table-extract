@@ -189,7 +189,7 @@ class PopplerProcessor(object):
         for i, char in enumerate(self.text):
             if not i in self.table_chars:  # FIXME add inside bbox removal.
                 l = self.layout[i]
-                if bbox != None and self.inside(l, bbrect):
+                if bbox is not None and self.inside(l, bbrect):
                     continue
                 chars.append(char)
         return "".join(chars)
@@ -658,10 +658,10 @@ class Extractor(object):
         if self.boxes:
             cells = [x + (pg,
                           "", ) for x in cells
-                     if (frow == None or (x[1] >= frow and x[1] <= lrow))]
+                     if (frow is None or (x[1] >= frow and x[1] <= lrow))]
         else:
             cells = [getCell(x) for x in cells
-                     if (frow == None or (x[1] >= frow and x[1] <= lrow))]
+                     if (frow is None or (x[1] >= frow and x[1] <= lrow))]
 
         if self.checkletters:
             self.imsave(outfile + "-text-locations.png", img)
@@ -813,28 +813,32 @@ class Extractor(object):
                         ctx.line = etree.Element("line")
                     curr_page.append(table)
                     table = None
-                    style = None
-            if bbox != None and self.pdfdoc.inside(la, bbrect):
+                    ctx.style = None
+            if bbox is not None and self.pdfdoc.inside(la, bbrect):
                 continue
             ctx.chars.append(c)
-            if l > la.x1: l = la.x1
-            if t > la.y1: t = la.y1
-            if r < la.x2: r = la.x2
-            if b < la.y2: b = la.y2
+            if l > la.x1:
+                l = la.x1
+            if t > la.y1:
+                t = la.y1
+            if r < la.x2:
+                r = la.x2
+            if b < la.y2:
+                b = la.y2
             endline = c == "\n"
             if endline or step:
                 store(ctx, endline=endline)
                 ctx.chars = []
                 if endline:
                     l, t, r, b = (1e10, 1e10, -1e10, -1e10)
-                    style = None
+                    ctx.style = None
         if len(ctx.chars) > 0:
             store(ctx, endline=True)
         if len(ctx.text) > 0:
             curr_page.append(ctx.text)
 
-    def xml_write(self, f):
-        self.etree.write(f, pretty_print=True, encoding="UTF-8")
+    def xml_write(self, f, pretty_print=True, encoding="UTF-8"):
+        self.etree.write(f, pretty_print=pretty_print, encoding=encoding)
 
     def _get_cells(self, pg):
         tbls = self.pages[pg].iterfind("table")
@@ -876,11 +880,11 @@ class Extractor(object):
 
         styles = node.iterfind(q)
         text = ""
-        t=etree.Element("text")
+        t = etree.Element("text")
         for s in styles:
             b = i = False
-            b = s.get("bold","0") == "1"
-            i = s.get("italic","0") == "1"
+            b = s.get("bold", "0") == "1"
+            i = s.get("italic", "0") == "1"
             t = s.text
             if i:
                 t = "<i>" + t + "</i>"
