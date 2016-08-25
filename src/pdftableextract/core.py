@@ -181,7 +181,7 @@ class PopplerProcessor(object):
         """
         # (cl,cr,ct,cb) == bbox if not None
         chars = []
-        if bbox != None:
+        if bbox is not None:
             _ = bbrect = Poppler.Rectangle()
             _.x1, _.x2, _.y1, _.y2 = bbox
             assert _.x1 <= _.x2
@@ -202,7 +202,7 @@ class PopplerProcessor(object):
         - `page`: referece to page
         """
         layout = self.layout
-        if layout == None:
+        if layout is None:
             raise RuntimeError("page is not chosen")
 
         answer = [(r.x1, r.y1, r.x2, r.y2) for r in layout]
@@ -300,11 +300,11 @@ class Extractor(object):
         self.notify = notify
         self.imsave = imsave
 
-        if imsave != None:
+        if imsave is not None:
             debug = True
 
         if debug:
-            if imsave == None:
+            if imsave is None:
                 raise RuntimeError("did not set image saving function")
             if not checkany:
                 raise RuntimeError("did not set what pictures to be shown")
@@ -314,7 +314,7 @@ class Extractor(object):
 
         self.outfile = outfilename if outfilename else "output"
 
-        if pgs != None:
+        if pgs is not None:
             pgs, self.frow, self.lrow = (
                 list(map(int, (str(pgs).split(":")))) + [None, None])[0:3]
             self.pgs = range(pgs, pgs + 1)
@@ -324,10 +324,10 @@ class Extractor(object):
         self.page_layout = page_layout
 
     def set_pages(self, startpage, endpage=None):
-        if startpage == None:
+        if startpage is None:
             self.pgs = None
             return
-        elif endpage == None:
+        elif endpage is None:
             endpage = startpage
         self.pgs = range(startpage, endpage + 1)
         self.frow = self.lrow = None
@@ -335,7 +335,7 @@ class Extractor(object):
     def initialize(self):
         """Initializes internal structures.
         """
-        if self.pgs == None:
+        if self.pgs is None:
             raise ValueError("pages to be processed are not set")
         pdfdoc = self.pdfdoc = PopplerProcessor(self.infile)
         pdfdoc.resolution = self.bitmap_resolution
@@ -350,9 +350,9 @@ class Extractor(object):
         """
         self.initialize()
         for page in self.pgs:
-            if notify != None:
+            if notify is not None:
                 notify(page)
-            if self.notify != None:
+            if self.notify is not None:
                 self.notify(page)
             self.process_page(page)
 
@@ -708,14 +708,14 @@ class Extractor(object):
             if self.page_layout:
                 self.follow_layout(page, curr_page, table)
             else:
-                if table != None:
+                if table is not None:
                     curr_page.append(table)
                 text = pdfdoc.get_rest_text(bbox=bbox)
 
-                if text != None:
+                if text is not None:
                     etext = etree.Element("text")
                     etext.text = text
-                if etext != None:
+                if etext is not None:
                     curr_page.append(etext)
 
     def follow_layout(self, page, curr_page, table=None):
@@ -804,7 +804,7 @@ class Extractor(object):
             la, c = _
             step, _ = get_attrs(i, ctx)
             if i in self.pdfdoc.table_chars:  # the character is already in a table.
-                if table == None:
+                if table is None:
                     continue
                 else:
                     if len(ctx.text) > 0:
@@ -856,7 +856,7 @@ class Extractor(object):
     def cells(self, pg=None):
         """Return all the cells found.
         """
-        if pg != None:
+        if pg is not None:
             return self._get_cells(pg)
         cells = []
         for p in self.pages.keys():
@@ -1023,7 +1023,7 @@ def o_cells_xml(cells,
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     text = None  # FIXME We will ignore text in cell_xml mode
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    if text != None:
+    if text is not None:
         root = etree.Element("document")
         if isinstance(text, str):
             t = etree.SubElement(root, "text")
