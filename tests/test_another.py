@@ -45,6 +45,10 @@ if __name__ == "__main__":
 
     cells = proc.cells()
 
+    proc.reduce(
+        inplace=True,
+        remove_pages=True
+    )
     proc.xml_write(open(out_xml, 'wb'))
 
     proc.output(table_html_filename=outfilename)

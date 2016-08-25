@@ -4,6 +4,7 @@ import os
 from numpy import array, ones, zeros, uint8, diff, where, sum
 from numpy import delete, frombuffer, reshape, all, any
 import numpy
+import copy
 
 #from xml.dom.minidom import getDOMImplementation
 from lxml import etree
@@ -839,6 +840,47 @@ class Extractor(object):
 
     def xml_write(self, f, pretty_print=True, encoding="UTF-8"):
         self.etree.write(f, pretty_print=pretty_print, encoding=encoding)
+
+    def reduce(self, remove_pages=False, join_styles=True, inplace=False):
+        """Reduces structure of etree,
+        joining styles, removing pages, etc.
+        """
+        edoc = etree.Element("document")
+        tree = etree.ElementTree(edoc)
+        if remove_pages:
+            texts = self.etree.iterfind("//page/text")
+            for t in texts:
+                edoc.append(self._join_styles(t, join_styles))
+        if inplace:
+            self.etree = tree
+        return tree
+
+    def _join_styles(self, text, really):
+        """Join adjacent style tags.
+        """
+        if not really:
+            return copy.deepcopy(text)
+        t = etree.Element("text")
+        t.attrib.update(text.attrib)
+        for line in text.iterfind("line"):
+            l = etree.Element("line")
+            l.attrib.update(line.attrib)
+            s = None
+            for style in line.iterfind("style"):
+                if s is None:
+                    s = copy.deepcopy(style)
+                    continue
+                if s.attrib == style.attrib:
+                    s.text += style.text
+                    continue
+                if s.text:
+                    l.append(s)
+                s = copy.deepcopy(style)
+            if s is not None and s.text:
+                l.append(s)
+            if len(l)>0:
+                t.append(l)
+        return t
 
     def _get_cells(self, pg):
         tbls = self.pages[pg].iterfind("table")
