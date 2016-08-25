@@ -845,12 +845,19 @@ class Extractor(object):
         """Reduces structure of etree,
         joining styles, removing pages, etc.
         """
-        edoc = etree.Element("document")
-        tree = etree.ElementTree(edoc)
+        tree = copy.deepcopy(self.etree)
+        edoc = tree.getroot()
         if remove_pages:
-            texts = self.etree.iterfind("//page/text")
-            for t in texts:
-                edoc.append(self._join_styles(t, join_styles))
+            pages = edoc.iterfind("page")
+            for p in pages:
+                # edoc.append(self._join_styles(t, join_styles))
+                for c in p.iterchildren():
+                    p.remove(c)
+                    #c=self._join_styles(c,join_styles)
+                    edoc.append(c)
+                    c.set("page", p.get("number"))
+                edoc.remove(p)
+
         if inplace:
             self.etree = tree
         return tree
