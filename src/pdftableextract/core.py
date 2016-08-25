@@ -853,7 +853,8 @@ class Extractor(object):
                 # edoc.append(self._join_styles(t, join_styles))
                 for c in p.iterchildren():
                     p.remove(c)
-                    #c=self._join_styles(c,join_styles)
+                    if c.tag == "text":
+                        c = self._join_styles(c, join_styles)
                     edoc.append(c)
                     c.set("page", p.get("number"))
                 edoc.remove(p)
@@ -866,28 +867,23 @@ class Extractor(object):
         """Join adjacent style tags.
         """
         if not really:
-            return copy.deepcopy(text)
-        t = etree.Element("text")
-        t.attrib.update(text.attrib)
+            return text
         for line in text.iterfind("line"):
-            l = etree.Element("line")
-            l.attrib.update(line.attrib)
             s = None
             for style in line.iterfind("style"):
                 if s is None:
-                    s = copy.deepcopy(style)
+                    s = style
+                    if s.text is None:
+                        s.text=''
                     continue
                 if s.attrib == style.attrib:
                     s.text += style.text
+                    line.remove(style)
                     continue
-                if s.text:
-                    l.append(s)
-                s = copy.deepcopy(style)
-            if s is not None and s.text:
-                l.append(s)
-            if len(l)>0:
-                t.append(l)
-        return t
+                if not s.text:
+                    line.remove(s)
+                    s = None
+        return text
 
     def _get_cells(self, pg):
         tbls = self.pages[pg].iterfind("table")
