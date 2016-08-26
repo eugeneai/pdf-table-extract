@@ -1,12 +1,16 @@
 from __future__ import print_function
 import pdftableextract as pdf
 import pprint
+import os.path
 
 DEBUG = False
 start_page = 1
-end_page = 6
+end_page = 240
+# start_page = 235
+# end_page = 235
 infile = "059285.pdf"
-outfilename = "out/{}-059285.html"
+base, ext = os.path.splitext(infile)
+outfilename = "out/{{}}-{}".format(base)
 
 if DEBUG:
     import matplotlib
@@ -20,8 +24,11 @@ else:
     debug_imsave = None
 
 checkall = DEBUG
-out_xml = outfilename.replace(
-    "html", "xml").format("xml-{}-{}".format(start_page, end_page))
+out_html = outfilename.format("page-{0}-{1}") + ".xhtml"
+out_xml = outfilename.format("xml-{0}-{1}") + ".xml"
+all_names = [out_html, out_xml]
+all_names = [n.format(start_page, end_page) for n in all_names]
+out_html, out_xml = all_names
 
 
 def notify_page(page):
@@ -37,7 +44,7 @@ proc = pdf.Extractor(
     bitmap_resolution=72,
     greyscale_threshold=50,
     notify=notify_page,
-    line_length=0.2,
+    #line_length=0.2,
     imsave=debug_imsave, )
 
 if __name__ == "__main__":
@@ -45,10 +52,7 @@ if __name__ == "__main__":
 
     cells = proc.cells()
 
-    proc.reduce(
-        inplace=True,
-        remove_pages=True
-    )
+    proc.reduce(inplace=True, remove_pages=True)
     proc.xml_write(open(out_xml, 'wb'))
-
-    proc.output(table_html_filename=outfilename)
+    proc.xhtml_write(open(out_html, "wb"))
+    # proc.output(table_html_filename=outfilename)

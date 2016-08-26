@@ -841,6 +841,97 @@ class Extractor(object):
     def xml_write(self, f, pretty_print=True, encoding="UTF-8"):
         self.etree.write(f, pretty_print=pretty_print, encoding=encoding)
 
+    def as_xhtml_tree(self, text="p", line="div"):
+        def update(element, attrib, include=None):
+            for k, v in attrib.items():
+                if include is not None:
+                    if k in include:
+                        element.set("data-pdf-" + k, v)
+                else:
+                    element.set("data-pdf-" + k, v)
+        tree = copy.deepcopy(self.etree)
+        for e in tree.getroot().getiterator():
+            attrib = {}
+            attrib.update(e.attrib)
+            e.attrib.clear()
+            if e.tag == "document":
+                e.tag = "div"
+                e.set("class", "pdf-document")
+            elif e.tag == "text":
+                e.tag = text
+                e.set("class", "pdf-text")
+                page = attrib.get("page", None)
+                if page is not None:
+                    e.set("data-pdf-page-number", page)
+            elif e.tag == "line":
+                e.tag = line
+                e.set("class", "pdf-line")
+                update(e, attrib)
+            elif e.tag == "page":
+                e.tag = "div"
+                e.set("data-pdf-page-number", attrib.get("number"))
+                e.set("class", "pdf-page")
+            elif e.tag == "style":
+                e.tag = "span"
+                etext = e.text
+                b = attrib.get("bold", "0")
+                i = attrib.get("italic", "0")
+                b, i = map(int, [b, i])
+                if b or i:
+                    prev = e
+                    if b:
+                        prev.text = None
+                        b = etree.SubElement(prev, "b")
+                        b.text = etext
+                        prev = b
+                    if i:
+                        prev.text = None
+                        i = etree.SubElement(prev, "i")
+                        i.text = etext
+                update(e, attrib, ["font-name","font-size","color","underline"])
+            elif e.tag=="table":
+                htable = self._as_xhtml_table(e)
+                _p=e.getparent()
+                e.addprevious(htable)
+                _p.remove(e)
+                update(htable, attrib)
+            else:
+                update(e, attrib)
+        return tree
+
+    def _as_xhtml_table(self, table, chtml=False):
+        nc = len(table)
+        if nc==0:
+            return None
+        htable = etree.Element("table")
+        if chtml:
+            htable.set("border", "1")
+            htable.set("cellspacing", "0")
+            htable.set("style", "border-spacing:0")
+            tr = None
+        oj=-1
+        for cell in table.iterchildren():
+            (i, j, u, v, pg) = [int(cell.get(v)) for v in "xywhp"]
+            value = cell.text if cell.text is not None else ""
+
+            if j > oj:
+                tr = etree.SubElement(htable, "tr")
+                oj = j
+            td = etree.SubElement(tr, "td")
+            td.text = value
+            if u > 1:
+                td.set("colspan", str(u))
+            if v > 1:
+                td.set("rowspan", str(v))
+            if chtml:
+                td.set("style", "background-color: #%02x%02x%02x" %
+                       tuple(128 + col(k / (nc + 0.))))
+        return htable
+
+    def xhtml_write(self, f, pretty_print=True, encoding="UTF-8"):
+        tree = self.as_xhtml_tree()
+        tree.write(f, pretty_print=pretty_print, encoding=encoding)
+
     def reduce(self, remove_pages=False, join_styles=True, inplace=False):
         """Reduces structure of etree,
         joining styles, removing pages, etc.
@@ -874,7 +965,7 @@ class Extractor(object):
                 if s is None:
                     s = style
                     if s.text is None:
-                        s.text=''
+                        s.text = ''
                     continue
                 if s.attrib == style.attrib:
                     s.text += style.text
