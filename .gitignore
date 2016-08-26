@@ -9,3 +9,6 @@ develop-eggs
 tmp
 build
 dist
+tests/out/
+src/gi/
+test*.xml

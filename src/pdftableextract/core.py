@@ -838,8 +838,16 @@ class Extractor(object):
         if len(ctx.text) > 0:
             curr_page.append(ctx.text)
 
-    def xml_write(self, f, pretty_print=True, encoding="UTF-8"):
-        self.etree.write(f, pretty_print=pretty_print, encoding=encoding)
+    def xml_write(self,
+                  f,
+                  pretty_print=True,
+                  encoding="UTF-8",
+                  xml_declaration=True):
+        self.etree.write(
+            f,
+            pretty_print=pretty_print,
+            encoding=encoding,
+            xml_declaration=xml_declaration)
 
     def as_xhtml_tree(self, text="div", line="div"):
         def update(element, attrib, include=None):
@@ -930,9 +938,17 @@ class Extractor(object):
                        tuple(128 + col(k / (nc + 0.))))
         return htable
 
-    def xhtml_write(self, f, pretty_print=True, encoding="UTF-8"):
+    def xhtml_write(self,
+                    f,
+                    pretty_print=True,
+                    encoding="UTF-8",
+                    xml_declaration=True):
         tree = self.as_xhtml_tree()
-        tree.write(f, pretty_print=pretty_print, encoding=encoding)
+        tree.write(
+            f,
+            pretty_print=pretty_print,
+            encoding=encoding,
+            xml_declaration=xml_declaration)
 
     def reduce(self, remove_pages=False, join_styles=True, inplace=False):
         """Reduces structure of etree,

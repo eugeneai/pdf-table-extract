@@ -4,10 +4,10 @@ import pprint
 import os.path
 
 DEBUG = False
-# start_page = 1
-# end_page = 240
-start_page = 235
-end_page = 235
+start_page = 1
+end_page = 240
+# start_page = 235
+# end_page = 235
 infile = "059285.pdf"
 base, ext = os.path.splitext(infile)
 outfilename = "out/{{}}-{}".format(base)
