@@ -4,10 +4,10 @@ import pprint
 import os.path
 
 DEBUG = False
-start_page = 1
-end_page = 240
-# start_page = 235
-# end_page = 235
+# start_page = 1
+# end_page = 240
+start_page = 235
+end_page = 235
 infile = "059285.pdf"
 base, ext = os.path.splitext(infile)
 outfilename = "out/{{}}-{}".format(base)
@@ -52,7 +52,7 @@ if __name__ == "__main__":
 
     cells = proc.cells()
 
-    proc.reduce(inplace=True, remove_pages=True)
+    proc.reduce(inplace=True, remove_pages=False)
     proc.xml_write(open(out_xml, 'wb'))
     proc.xhtml_write(open(out_html, "wb"))
     # proc.output(table_html_filename=outfilename)

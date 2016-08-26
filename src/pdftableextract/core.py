@@ -841,7 +841,7 @@ class Extractor(object):
     def xml_write(self, f, pretty_print=True, encoding="UTF-8"):
         self.etree.write(f, pretty_print=pretty_print, encoding=encoding)
 
-    def as_xhtml_tree(self, text="p", line="div"):
+    def as_xhtml_tree(self, text="div", line="div"):
         def update(element, attrib, include=None):
             for k, v in attrib.items():
                 if include is not None:
@@ -849,6 +849,7 @@ class Extractor(object):
                         element.set("data-pdf-" + k, v)
                 else:
                     element.set("data-pdf-" + k, v)
+
         tree = copy.deepcopy(self.etree)
         for e in tree.getroot().getiterator():
             attrib = {}
@@ -888,10 +889,11 @@ class Extractor(object):
                         prev.text = None
                         i = etree.SubElement(prev, "i")
                         i.text = etext
-                update(e, attrib, ["font-name","font-size","color","underline"])
-            elif e.tag=="table":
+                update(e, attrib,
+                       ["font-name", "font-size", "color", "underline"])
+            elif e.tag == "table":
                 htable = self._as_xhtml_table(e)
-                _p=e.getparent()
+                _p = e.getparent()
                 e.addprevious(htable)
                 _p.remove(e)
                 update(htable, attrib)
@@ -901,7 +903,7 @@ class Extractor(object):
 
     def _as_xhtml_table(self, table, chtml=False):
         nc = len(table)
-        if nc==0:
+        if nc == 0:
             return None
         htable = etree.Element("table")
         if chtml:
@@ -909,7 +911,7 @@ class Extractor(object):
             htable.set("cellspacing", "0")
             htable.set("style", "border-spacing:0")
             tr = None
-        oj=-1
+        oj = -1
         for cell in table.iterchildren():
             (i, j, u, v, pg) = [int(cell.get(v)) for v in "xywhp"]
             value = cell.text if cell.text is not None else ""
@@ -941,7 +943,6 @@ class Extractor(object):
         if remove_pages:
             pages = edoc.iterfind("page")
             for p in pages:
-                # edoc.append(self._join_styles(t, join_styles))
                 for c in p.iterchildren():
                     p.remove(c)
                     if c.tag == "text":
@@ -949,7 +950,11 @@ class Extractor(object):
                     edoc.append(c)
                     c.set("page", p.get("number"))
                 edoc.remove(p)
-
+        else:
+            pages = edoc.iterfind("page")
+            for p in pages:
+                for c in p.iterchildren("text"):
+                    self._join_styles(c, join_styles)
         if inplace:
             self.etree = tree
         return tree
